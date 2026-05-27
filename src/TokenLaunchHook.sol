@@ -17,32 +17,24 @@ import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/Pool
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 
-
 contract TokenLaunchHook is BaseHook {
-    
-    constructor(
-        IPoolManager _manager
-    ) 
-        BaseHook(_manager) 
-    {
-        
-    }
+    constructor(IPoolManager _manager) BaseHook(_manager) {}
 
     // -----------------------------------------------------------------------
     // Hook permissions
     // -----------------------------------------------------------------------
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: true,                       // no-op (V4 enforces first-init-wins)
+            beforeInitialize: true, // no-op (V4 enforces first-init-wins)
             afterInitialize: false,
-            beforeAddLiquidity: true,                     // bootstrap + whitelist + sniper checks
+            beforeAddLiquidity: true, // bootstrap + whitelist + sniper checks
             afterAddLiquidity: false,
-            beforeRemoveLiquidity: true,                  // governance burn protection + M3 lock check
+            beforeRemoveLiquidity: true, // governance burn protection + M3 lock check
             afterRemoveLiquidity: false,
-            beforeSwap: true,                             // anti-snipe + tax (fee override) + whitelist
-            afterSwap: true,                              // M3 volume tracking
-            beforeSwapReturnDelta: true,                  // v2: bonding curve fallback (M6)
-            afterSwapReturnDelta: true,                   // v2: treasury fee routing (M8) + auto-buyback (M7)
+            beforeSwap: true, // anti-snipe + tax (fee override) + whitelist
+            afterSwap: true, // M3 volume tracking
+            beforeSwapReturnDelta: true, // v2: bonding curve fallback (M6)
+            afterSwapReturnDelta: true, // v2: treasury fee routing (M8) + auto-buyback (M7)
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false,
             beforeDonate: false,
