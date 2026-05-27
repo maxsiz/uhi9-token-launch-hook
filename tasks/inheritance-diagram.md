@@ -1,9 +1,10 @@
-# TokenLaunchHook — диаграмма наследования контрактов
+# TokenLaunchHook — contract inheritance diagram
 
-Фактическая иерархия по коду в `src/`. `GovernanceModule` — общий базовый контракт для модулей с
-governance-сеттерами (M2/M3/M5); M1 (AntiSnipe) самостоятелен (без governance-сеттеров).
-`TokenLaunchHook` собирает все модули и `BaseHook`; `GovernanceModule` попадает в него по «ромбу»
-через M2/M3/M5 (Solidity C3-линеаризация включает его один раз, конструктор инициализирует один раз).
+The actual hierarchy as implemented in `src/`. `GovernanceModule` is the shared base for the modules
+that expose governance setters (M2/M3/M5); M1 (AntiSnipe) is standalone (it has no governance setters).
+`TokenLaunchHook` assembles every module plus `BaseHook`; `GovernanceModule` reaches it via the
+diamond through M2/M3/M5 (Solidity's C3 linearization includes it once, and the constructor initializes
+it once).
 
 ```mermaid
 classDiagram
@@ -74,11 +75,12 @@ classDiagram
     TokenLaunchHook ..> MechanismConfig : uses
 ```
 
-**Легенда:**
-- `A <|-- B` — B наследует A.
-- `A ..> B : uses` — B использует библиотеку A (не наследование).
-- `<<v4-periphery>>` — внешние контракты из `lib/v4-hooks-public` (`BaseHook` → `ImmutableState`).
+**Legend:**
+- `A <|-- B` — B inherits from A.
+- `A ..> B : uses` — B uses library A (not inheritance).
+- `<<v4-periphery>>` — external contracts from `lib/v4-hooks-public` (`BaseHook` → `ImmutableState`).
 
-**Не входят в иерархию хука** (отдельные контракты, ещё не реализованы):
-`CampaignWrapper` (task_008) — координатор лонча, вызывает `TokenLaunchHook` через PositionManager;
-`TokenFactory` + `StandardToken` (task_006) — опциональный клонер ERC-20, независим от хука.
+**Outside the hook hierarchy** (standalone contracts, not yet implemented):
+`CampaignWrapper` (task_008) — the launch coordinator that drives `TokenLaunchHook` through the
+PositionManager; `TokenFactory` + `StandardToken` (task_006) — an optional ERC-20 cloner, independent
+of the hook.
