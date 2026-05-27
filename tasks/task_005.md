@@ -1,5 +1,6 @@
 # task_005 — M5 WhitelistPhaseMechanism (опциональный модуль)
 
+> **Статус: ✅ DONE** — влито в master (коммит `77e2dde`, 19 тестов зелёные).
 > Commit tag: `#5` · ветка: `task_005-whitelist-phase`
 > Спека: `tasks/TokenLaunchHook.md` → раздел **M5 WhitelistPhaseMechanism — Finalized Spec**.
 
