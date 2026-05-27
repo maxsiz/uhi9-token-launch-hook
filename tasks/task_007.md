@@ -1,5 +1,6 @@
 # task_007 — TokenLaunchHook: сборка модулей + MechanismConfig
 
+> **Статус: ✅ DONE** — влито в master (коммит `f7712b5`, 102 теста зелёные).
 > Commit tag: `#7` · ветка: `task_007-hook-assembly`
 > Спека: `tasks/TokenLaunchHook.md` → разделы **TokenLaunchHook — skeleton**,
 > **Modular Mechanism Architecture**, **Required Hook Permissions**.
