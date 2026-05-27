@@ -38,7 +38,6 @@ abstract contract LiquidityLockMechanism is GovernanceModule {
 
     error NoConditionsEnabled();
     error UnlockTimeBeforeLaunchEnd();
-    error CanOnlyRelax();
     error MustKeepOneCondition();
     error LiquidityStillLocked();
     error AlreadyOr();

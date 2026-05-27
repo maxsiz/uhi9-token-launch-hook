@@ -220,7 +220,7 @@ contract WhitelistPhaseMechanismTest is Test {
     function test_relaxEndTime_laterThanCurrent_reverts() public {
         _setup();
         vm.prank(alice);
-        vm.expectRevert(WhitelistPhaseMechanism.CanOnlyRelax.selector);
+        vm.expectRevert(GovernanceModule.CanOnlyRelax.selector);
         h.relaxWhitelistEndTime(pid, launchTime + 20 days);
     }
 }

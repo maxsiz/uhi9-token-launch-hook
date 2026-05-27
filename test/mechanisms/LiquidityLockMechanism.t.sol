@@ -217,7 +217,7 @@ contract LiquidityLockMechanismTest is Test {
     function test_relaxUnlockTime_higherThanCurrent_reverts() public {
         _setupDefault();
         vm.prank(alice);
-        vm.expectRevert(LiquidityLockMechanism.CanOnlyRelax.selector);
+        vm.expectRevert(GovernanceModule.CanOnlyRelax.selector);
         h.relaxUnlockTime(pid, launchTime + 70 days);
     }
 
