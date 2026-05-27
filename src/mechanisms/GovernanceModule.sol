@@ -59,6 +59,8 @@ abstract contract GovernanceModule {
     error MustUsePositionManager();
     error CannotBurnGovernanceNFT();
     error InvalidLaunchDuration();
+    /// @dev Shared by mechanisms whose mutable params are one-way relaxable (M3, M5).
+    error CanOnlyRelax();
 
     // -----------------------------------------------------------------------
     // Events

@@ -27,7 +27,6 @@ abstract contract WhitelistPhaseMechanism is GovernanceModule {
 
     error NotWhitelisted();
     error InvalidWhitelistEndTime();
-    error CanOnlyRelax();
 
     event WhitelistPhaseInitialized(PoolId indexed pid, uint64 whitelistEndTime);
     event WhitelistEndTimeRelaxed(PoolId indexed pid, uint64 oldTime, uint64 newTime);
