@@ -1,5 +1,6 @@
 # task_004 — M3 LiquidityLockMechanism
 
+> **Статус: ✅ DONE** — влито в master (коммит `4231025`, 20 тестов зелёные).
 > Commit tag: `#4` · ветка: `task_004-liquidity-lock`
 > Спека: `tasks/TokenLaunchHook.md` → раздел **M3 LiquidityLockMechanism — Finalized Spec**.
 
