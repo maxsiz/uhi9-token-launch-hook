@@ -1,5 +1,6 @@
 # task_003 — M2 BuySellTaxMechanism + LaunchMath
 
+> **Статус: ✅ DONE** — влито в master (PR #3, коммит `becafee`, 15 + 8 тестов зелёные).
 > Commit tag: `#3` · ветка: `task_003-buysell-tax`
 > Спека: `tasks/TokenLaunchHook.md` → раздел **M2 BuySellTaxMechanism — Finalized Spec**.
 

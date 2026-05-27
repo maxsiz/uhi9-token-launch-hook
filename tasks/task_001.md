@@ -1,5 +1,6 @@
 # task_001 — GovernanceModule + тест-инфраструктура (фундамент)
 
+> **Статус: ✅ DONE** — влито в master (PR #1, коммит `16f3d37`, 15 тестов зелёные).
 > Commit tag: `#1` · ветка: `task_001-governance-module`
 > Спека: `tasks/TokenLaunchHook.md` → разделы **GovernanceModule — Finalized Spec** и
 > **Salt = tokenId convention**.

@@ -1,5 +1,6 @@
 # task_002 — M1 AntiSnipeMechanism
 
+> **Статус: ✅ DONE** — влито в master (PR #2, коммит `8dfea3a`, 8 тестов зелёные).
 > Commit tag: `#2` · ветка: `task_002-antisnipe`
 > Спека: `tasks/TokenLaunchHook.md` → раздел **M1 AntiSnipeMechanism — Finalized Spec**.
 
