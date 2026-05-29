@@ -1,5 +1,6 @@
 # task_006 — TokenFactory + StandardToken (независимый)
 
+> **Статус: ✅ DONE** — влито в master (merge `e3fb88a`, 6 тестов зелёные, полный прогон 108).
 > Commit tag: `#6` · ветка: `task_006-token-factory`
 > Спека: `tasks/TokenLaunchHook.md` → раздел **TokenFactory — optional minimal-proxy factory**.
 
