@@ -59,7 +59,7 @@ contract TokenLaunchHook is
     // -----------------------------------------------------------------------
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: false, 
+            beforeInitialize: false,
             afterInitialize: false,
             beforeAddLiquidity: true, // bootstrap + whitelist + sniper checks
             afterAddLiquidity: false,
@@ -166,6 +166,7 @@ contract TokenLaunchHook is
         returns (bytes4, int128)
     {
         PoolId pid = key.toId();
+        // Think about track after campaign finished
         if (enabled[pid].lock) _trackVolume(pid, delta, _governance[pid].tokenIsCurrency0);
         return (BaseHook.afterSwap.selector, int128(0));
     }
@@ -184,6 +185,8 @@ contract TokenLaunchHook is
             _checkBurnProtection(pid, params); // G3 — minimum lock until launchEndTime
             if (enabled[pid].lock) _checkLiquidityLock(pid); // M3 — extra conditions when enabled
         }
+
+        // TODO think about staking
 
         return BaseHook.beforeRemoveLiquidity.selector;
     }
