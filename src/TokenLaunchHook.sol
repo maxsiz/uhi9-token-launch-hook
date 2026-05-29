@@ -59,7 +59,7 @@ contract TokenLaunchHook is
     // -----------------------------------------------------------------------
     function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
         return Hooks.Permissions({
-            beforeInitialize: true, // no-op (V4 enforces first-init-wins)
+            beforeInitialize: false, 
             afterInitialize: false,
             beforeAddLiquidity: true, // bootstrap + whitelist + sniper checks
             afterAddLiquidity: false,
@@ -79,11 +79,6 @@ contract TokenLaunchHook is
     // -----------------------------------------------------------------------
     // Callbacks
     // -----------------------------------------------------------------------
-
-    function _beforeInitialize(address, PoolKey calldata, uint160) internal pure override returns (bytes4) {
-        // No-op: config arrives via hookData on the first mint.
-        return BaseHook.beforeInitialize.selector;
-    }
 
     function _beforeAddLiquidity(
         address sender,
