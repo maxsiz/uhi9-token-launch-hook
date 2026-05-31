@@ -1,5 +1,6 @@
 # task_008 — CampaignWrapper (атомарный launch)
 
+> **Статус: ✅ DONE** — влито в master (merge `7c75397`, PR #5, 8 тестов зелёные, полный прогон 116).
 > Commit tag: `#8` · ветка: `task_008-campaign-wrapper`
 > Спека: `tasks/TokenLaunchHook.md` → разделы **CampaignWrapper — skeleton**,
 > **Atomic launch flow (full TX)**.
