@@ -1,5 +1,6 @@
 # task_009 — Deploy-скрипты + fork-тест
 
+> **Статус: ✅ DONE** — влито в master (merge `b9933f1`, 4 fork-теста зелёные на живом mainnet-форке, полный прогон 116 + 4 skip).
 > Commit tag: `#9` · ветка: `task_009-deploy-scripts`
 > Спека: `tasks/TokenLaunchHook.md` → разделы **Multi-chain deployment**, **Deploy scripts**,
 > **Critical Files to Create → Deploy scripts**.
