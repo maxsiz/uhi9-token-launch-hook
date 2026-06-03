@@ -40,6 +40,19 @@ Transparency Layer**, landing, wizard skeleton (presets + hook plan), governance
 reads). TODO (DESIGN.md §9): `priceMath.ts` (v4-sdk math), `permit2.ts` (EIP-712 sign), wizard form
 fields + simulate/write, governance setters behind `OwnerGuard`.
 
+## Screenshots
+
+Captured from the local production build (`npm run build && npm run start`) with a mock injected
+wallet so the connected flow renders. See [`screenshots/`](./screenshots).
+
+| | |
+|---|---|
+| **Landing** — "what the hook does" cards | ![landing](./screenshots/01-landing.png) |
+| **Wizard · Token** — first step, `_beforeAddLiquidity · Governance` badge | ![token](./screenshots/02-wizard-token.png) |
+| **Wizard · Mechanisms** — presets + per-toggle hook badges + **Hook plan** | ![mechanisms](./screenshots/03-wizard-mechanisms.png) |
+| **Wizard · Review** — Hook plan with effects + source links | ![review](./screenshots/04-wizard-review.png) |
+| **Governance** — pool lookup, live hook reads, badged actions | ![governance](./screenshots/05-governance.png) |
+
 ## Deploy (Vercel)
 
 Root Directory = `web/`. Build `next build` (with `prebuild` codegen). Set
