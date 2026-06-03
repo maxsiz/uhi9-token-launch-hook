@@ -26,6 +26,16 @@ The frontend is the missing off-chain piece called for in `TokenLaunchHook.md`
 Design priority: **simple, correct, gas-safe.** The UI mirrors every contract invariant
 client-side so users never sign a transaction that will revert.
 
+### This is a demo for the hook
+
+A second, equally important goal: the frontend is a **live demonstration of `TokenLaunchHook`**.
+Every feature must visibly state **which hook functionality it exercises** — the specific hook
+callback (`_beforeAddLiquidity`, `_beforeSwap`, `_afterSwap`, `_beforeRemoveLiquidity`) and the
+mechanism module behind it. A user (or an evaluator) should be able to look at any control and
+understand *what the hook does at that moment on-chain*. This is realized as a cross-cutting
+**Hook Transparency Layer** (§5) wired into the wizard, the dashboard, and every transaction
+trace. The UI is never a black box over the contract — it is a guided tour of it.
+
 ### Critical constraint: EOA-only launch
 
 `launchCampaign` requires `tx.origin == msg.sender == cfg.deployer` (anti-sandwich check in the
@@ -102,6 +112,11 @@ web/
       TaxPanel.tsx             # effective/initial/base tax; setBuyTaxOverride/setSellTaxOverride
       LockPanel.tsx            # lockConfigOf + relax/disable/switchToOr; isUnlocked + volume
       WhitelistPanel.tsx       # whitelistConfigOf + add/addMany/remove/relaxEnd; isAddressWhitelisted
+    hook/                      # DEMO: Hook Transparency Layer (§5)
+      HookBadge.tsx            # small chip: callback + mechanism a control exercises
+      HookExplainer.tsx        # popover: what the hook does for this control, on-chain
+      HookCallTrace.tsx        # post-TX: which callbacks fired + decoded effect (events)
+      HookActivityPanel.tsx    # dashboard: live per-pool hook state read from views
     ui/
       Button.tsx               # idle/disabled/simulating/awaiting-signature/pending/success/error
       Address.tsx              # 0x1234…abcd + copy + explorer link
@@ -123,7 +138,9 @@ web/
       permit2.ts               # allowance check → nonce → PermitBatch sign → encode (PermitBatch,bytes)
       poolId.ts                # PoolId = keccak256(abi.encode(PoolKey)) for governance lookup
     validation/
-      launchSchema.ts          # zod rules mirroring contract reverts (§6)
+      launchSchema.ts          # zod rules mirroring contract reverts (§7)
+    hook/
+      hookMap.ts               # DEMO: feature → {callback, mechanism, doc} mapping (§5)
     format.ts                  # truncateAddress, formatUnits/parseUnits wrappers, taxToPercent
   scripts/
     gen-contracts.ts           # prebuild: read broadcast JSON → contracts.generated.ts
@@ -251,7 +268,68 @@ Leave wrapper-injected fields zero/false — the wrapper overwrites them:
 
 ---
 
-## 5. Web3 UX Best Practices
+## 5. Hook Transparency Layer (Demo)
+
+This is what makes the app a **demo for the hook**: every feature is annotated with the exact hook
+functionality it triggers, and every transaction shows which callbacks actually fired on-chain.
+
+### 5.1 Principle
+
+No control is a black box. Wherever the user configures or triggers something, the UI displays:
+
+- **Callback** — which hook entry point runs (`_beforeAddLiquidity`, `_beforeSwap`, `_afterSwap`, `_beforeRemoveLiquidity`).
+- **Mechanism** — which module enforces it (Governance, M1 AntiSnipe, M2 BuySellTax, M3 LiquidityLock, M5 WhitelistPhase).
+- **Effect** — one-line plain-language description of what the hook does at that point.
+
+### 5.2 Feature → hook mapping (`lib/hook/hookMap.ts`)
+
+A single source-of-truth data table drives all annotations:
+
+| UI feature / control | Hook callback | Mechanism | What the hook does |
+|---|---|---|---|
+| Submit launch (first mint) | `_beforeAddLiquidity` (bootstrap) | Governance | Decodes `hookData`, captures the first LP NFT as governance NFT (`salt == tokenId`), validates `tx.origin`, init price, stores `EnabledMechanisms` + per-module config |
+| Launch duration / phase | `_beforeAddLiquidity` + all setters | Governance | Sets `launchTime`/`launchEndTime`; `onlyGovernance` gating; `launchPhaseOf` Pre/Active/Frozen |
+| Anti-snipe window + max buy | `_beforeSwap` | M1 AntiSnipe | Caps per-TX buy size during the window; blocks exact-out buys; sells unrestricted |
+| Buy/sell tax + decay | `_beforeSwap` | M2 BuySellTax | Returns a dynamic LP fee (`uint24`) per swap from the linear tax decay; asymmetric buy vs sell |
+| Liquidity lock (time/volume) | `_beforeRemoveLiquidity` + `_afterSwap` | M3 LiquidityLock | `_afterSwap` accumulates pair-side volume; `_beforeRemoveLiquidity` blocks gov-NFT exit until unlock (AND/OR) |
+| Whitelist phase | `_beforeSwap` + `_beforeAddLiquidity` | M5 WhitelistPhase | Rejects non-whitelisted swaps/adds until `whitelistEndTime`; removes always allowed |
+| Gov-NFT burn protection | `_beforeRemoveLiquidity` | Governance | Reverts decrease/burn of the gov NFT during the active phase |
+| Tax override (dashboard) | governance setter → affects `_beforeSwap` | M2 BuySellTax | Ratchets the effective fee down for future swaps |
+| Relax/disable lock (dashboard) | governance setter → affects `_beforeRemoveLiquidity` | M3 LiquidityLock | Loosens unlock conditions (earlier time / lower volume / OR / disable) |
+| Manage whitelist (dashboard) | governance setter → affects `_beforeSwap` | M5 WhitelistPhase | Adds/removes addresses; shortens the gated window |
+
+Each row also carries a short doc string and a link to the relevant `src/mechanisms/*.sol`.
+
+### 5.3 Where it surfaces in the UI
+
+- **Wizard.** Each mechanism sub-form (`Step3Mechanisms`) header shows a `HookBadge` (callback +
+  mechanism) and a `HookExplainer` popover. The preset selector lists, per preset, which callbacks
+  light up — so picking "Memecoin" visibly means "this enables `_beforeSwap` anti-snipe + tax and
+  `_beforeRemoveLiquidity` lock".
+- **Review (`Step4Review`).** A "Hook plan" summary: given the chosen config, list every callback
+  that will run on this pool and what it will enforce — derived from `enabled` flags via `hookMap`.
+- **Post-launch (`Step5Sign` / `TxToast`).** `HookCallTrace` parses the receipt's logs
+  (`CampaignBootstrapped`, `*Initialized` events) and shows "the hook fired `_beforeAddLiquidity` →
+  Governance bootstrap; captured NFT #1247; initialized M1/M2/M3" — proof the hook ran.
+- **Governance dashboard.** `HookActivityPanel` reads the hook's view functions live
+  (`launchPhaseOf`, `effectiveBuyTaxOf`/`effectiveSellTaxOf`, `cumulativeVolumeOf`, `isUnlocked`,
+  `isAddressWhitelisted`) and renders, per mechanism, "current on-chain state + which callback
+  produced it". Each governance action is badged with the callback it will influence.
+
+### 5.4 Components
+
+- `HookBadge` — compact chip `[_beforeSwap · M2 Tax]`; color-coded per callback.
+- `HookExplainer` — popover with the plain-language effect + a `src/mechanisms/*.sol` link.
+- `HookCallTrace` — receipt-driven, lists fired callbacks + decoded events after a TX.
+- `HookActivityPanel` — dashboard widget, live view-function reads mapped back to callbacks.
+
+A global **"Demo mode"** toggle (default on) controls verbosity: on = full badges/explainers/traces
+for evaluation; off = a clean production launch UI. The toggle only affects presentation, never the
+transaction built.
+
+---
+
+## 6. Web3 UX Best Practices
 
 - **Connect-button states.** Disconnected → "Connect Wallet" (RainbowKit). Connected → truncated
   address + ENS + chain pill. Wrong chain → "Switch network". All onchain actions behind `ConnectGate`.
@@ -284,7 +362,7 @@ Leave wrapper-injected fields zero/false — the wrapper overwrites them:
 
 ---
 
-## 6. Client-side Validation (`lib/validation/launchSchema.ts`)
+## 7. Client-side Validation (`lib/validation/launchSchema.ts`)
 
 Mirror every contract revert so users never waste gas. (Constants verified against source — see Appendix.)
 
@@ -318,7 +396,7 @@ strictly below any prior override → `CanOnlyLowerTax`); `relaxUnlockTime` stri
 
 ---
 
-## 7. Presets (`Step3Mechanisms.tsx`)
+## 8. Presets (`Step3Mechanisms.tsx`)
 
 Pre-baked `EnabledMechanisms` combos; selection pre-fills toggles and shows/hides the relevant
 config sub-forms. "Custom" exposes all four toggles.
@@ -333,7 +411,7 @@ config sub-forms. "Custom" exposes all four toggles.
 
 ---
 
-## 8. Vercel Deployment
+## 9. Vercel Deployment
 
 - **Root Directory = `web/`** (Foundry repo is at the repo root; only `web/` is the Next app).
 - **Build:** default `next build`, with `"prebuild": "tsx scripts/gen-contracts.ts"` for address
@@ -350,7 +428,7 @@ config sub-forms. "Custom" exposes all four toggles.
 
 ---
 
-## 9. Phased Implementation Roadmap
+## 10. Phased Implementation Roadmap
 
 1. **Scaffold** — `web/` Next App Router + TS + Tailwind; `providers.tsx`, `chains.ts` (4 chains +
    fallback transports), landing page, global metadata, favicon/OG. Connect button working; EOA
@@ -360,16 +438,19 @@ config sub-forms. "Custom" exposes all four toggles.
 3. **Launch wizard core** — Steps 1–4. Implement `priceMath.ts` and `buildParams.ts`; the
    `launchSchema.ts` rules; Step 4 runs `simulateContract` and shows the decoded result. Happy path
    = fresh token + native ETH (empty `permitData`, single TX).
-4. **Permit2 path** — `permit2.ts` (allowance → nonce → `PermitBatch` sign → encode tuple);
+4. **Hook Transparency Layer (demo)** — `lib/hook/hookMap.ts` + `HookBadge`/`HookExplainer`/
+   `HookCallTrace`; wire badges into the wizard mechanism forms + preset selector, the Review "Hook
+   plan", and the post-TX trace. Demo-mode toggle. (§5)
+5. **Permit2 path** — `permit2.ts` (allowance → nonce → `PermitBatch` sign → encode tuple);
    approve + sign steps in the stepper; wire existing-token / ERC-20-pair launches.
-5. **Governance dashboard** — `poolId.ts`, read panels (phase/tax/lock/whitelist), `OwnerGuard`,
-   write actions with ratchet-down validation, simulate→write→refetch.
-6. **Polish & deploy** — button/error/address/amount components, RPC fallback, optional USD context,
+6. **Governance dashboard** — `poolId.ts`, read panels (phase/tax/lock/whitelist), `OwnerGuard`,
+   write actions with ratchet-down validation, simulate→write→refetch; `HookActivityPanel` live reads.
+7. **Polish & deploy** — button/error/address/amount components, RPC fallback, optional USD context,
    explorer links, metadata/OG, responsive; configure Vercel (root `web/`, env vars); preview → prod.
 
 ---
 
-## 10. Out of Scope / Future
+## 11. Out of Scope / Future
 
 - **Trading / swap UI** against the launched pool (use Uniswap's own UI or the v4 swap SDK later).
 - **Indexer / subgraph discovery feed** ("browse launches") — needs event indexing (The Graph / Ponder).
