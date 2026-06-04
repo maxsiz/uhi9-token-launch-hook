@@ -1145,6 +1145,8 @@ Result: `launchEndTime` is the **minimum lock duration**, M3 extends it with str
 
 **Scope:** M3 applies ONLY to governance NFT. Other LP NFTs (joining after launch) are free to add/remove anytime. Avoids overly-restrictive UX for retail LPs.
 
+> **⚠️ Deployer foot-gun (audit L-1, accepted self-inflicted risk).** All relaxation setters are gated by `onlyGovernance`, which reverts once `block.timestamp >= launchEndTime` — the config is **frozen after launch end** (this is the trader-facing guarantee; relaxing post-launch would let a deployer rug a promised lock). Consequence: a lock that **requires** the volume condition — `volume-only`, or `AND` with `volumeEnabled` — whose `unlockVolumeThreshold` organic trading never reaches is **permanently** unsatisfiable, trapping the deployer's own seed LP forever (time is the only condition guaranteed to eventually pass). This harms only the deployer's own funds, so it is documented rather than code-restricted. **Recommendation:** if unsure, use `OR` logic with `timeEnabled` (always eventually releasable) and treat volume as an early-release bonus; set `unlockTime`/`unlockVolumeThreshold` to values you are certain are reachable.
+
 ### Configuration (2 slots per pool)
 
 ```solidity
