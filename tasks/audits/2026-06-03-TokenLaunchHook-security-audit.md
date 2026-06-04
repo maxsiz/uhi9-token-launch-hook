@@ -63,6 +63,63 @@ launches; griefing + governance capture; no direct theft).
 3. Document explicitly that existing-token launches must use a fresh fee/tickSpacing and accept the
    front-run/DoS risk (weakest; only if (1)/(2) are out of scope for v1).
 
+**Follow-up (2026-06-04) — PoC confirmed; "require launched-token amount" hardening assessed.**
+PoC: `test/TokenLaunchHook.bootstrapHijack.t.sol` (3 cases). The hijack needs **no balance of the
+launched token at all** — only the *pair* asset: the attacker bootstraps the canonical pool by minting
+**single-sided liquidity below the current price** (range entirely below the tick → the position needs
+`currency1` only, launched-token amount = 0), and this works **through the stock `CampaignWrapper`**
+(set the launched side's `amountMax = 0`), not just via a direct PositionManager call. A bare
+`initialize` yields a priced-but-empty pool but captures no governance; a `liquidity == 0` mint is
+rejected by PositionManager (`CannotUpdateEmptyPosition`).
+
+Considered fix — *require the bootstrap position to contribute a non-zero launched-token amount* (reject
+a range sitting entirely on the pair side of the price; computable in `_bootstrap` from `sqrtPriceNow` +
+tick range + `liquidityDelta` + `tokenIsCurrency0`):
+- Closes the **free** capture path and restores the invariant "you must post real launched-token
+  liquidity to own the launch"; composes with the G3 gov-NFT lock so a hijack now costs the attacker
+  launched-token capital locked until `launchEndTime` (and a max-tax pool traps the attacker too) →
+  turns a free grief into a costly, usually irrational one. Compatible with common **token-only**
+  single-sided launches; only forbids pair-only seeds.
+- Does **not** fix the root cause: for an *obtainable* existing token the attacker buys dust to pass a
+  `> 0` check and still front-runs; a "meaningful amount" threshold is not generically definable (the
+  hook cannot know supply/decimals intent). For a non-obtainable token the launch was already safe
+  (fresh-token case). **Verdict:** ship as cheap defense-in-depth, but a real fix still needs
+  PoolKey-unpredictability or out-of-band deployer binding (options 1–3).
+
+**Design decision required (2026-06-04).** There is **no permissionless fix** for H-1 on an arbitrary
+*existing* token: the `PoolKey` (hence `PoolId`) is fully predictable and the unmodified ERC-20 confers
+no on-chain "rightful launcher", so any first-come check (bootstrap or pre-registration alike) is
+front-runnable, and the hook cannot even identify the `CampaignWrapper` (the bootstrap's `sender` is
+always `PositionManager`; the wrapper is one frame above and invisible except via `hookData`). The fork:
+
+- **A — stay permissionless (accept residual risk).** Apply the cheap `launched-token > 0` hardening
+  (removes the *free* single-sided capture), and operationally rely on a fresh `fee`/`tickSpacing` per
+  launch (option 3) and/or private-relay submission. H-1 is **mitigated, not closed**: a squatter who
+  can obtain the existing token (or pre-target the `PoolId`) can still front-run. Keeps "one shared
+  permissionless hook per chain"; no new trust, no off-chain infra, no admin role.
+- **B — gate bootstrap behind a trusted signer (close H-1).** Hook stores a `LAUNCH_SIGNER`; bootstrap
+  requires an off-chain signature over `(chainid, poolId, deployer, configHash, deadline)` (option 1 —
+  the only realizable form, since the wrapper has no key). H-1 is **closed** for existing tokens, at the
+  cost of: turning the shared hook into a **curated launchpad** (no longer permissionless), a new
+  trusted key (leak ⇒ full bypass; signer downtime ⇒ liveness/censorship), an off-chain signing
+  service, and key-rotation handling (immutable signer ⇒ redeploy to rotate; settable signer ⇒ adds an
+  **owner** role the hook currently lacks).
+- **(Option 2, pre-registration, is a strictly weaker middle ground:** permissionless and keyless, but
+  the registration step is itself front-runnable for a predictable `PoolId` — it only protects tokens
+  the deployer registers before any squatter, e.g. at token-deploy time.)
+
+This is a **product/decentralization choice, not a purely technical one** — left to the project owners.
+Recommended default: **A** for a permissionless v1 (cheap hardening + documented residual risk),
+escalating to **B** only if a curated launch flow is acceptable.
+
+**Decision (2026-06-04): option A — stay permissionless.** Implemented on branch
+`task_012-h1-launched-token-hardening`: `_bootstrap` now reverts `ZeroLaunchedTokenLiquidity` unless the
+governance mint contributes a non-zero launched-token amount (checked against the tick range vs the
+init price), removing the free pair-only single-sided capture. The residual front-run risk for an
+*obtainable* existing token is **accepted and documented** — deployers should launch on a fresh
+`fee`/`tickSpacing` and/or via a private relay. Regression coverage:
+`test/TokenLaunchHook.bootstrapHijack.t.sol`.
+
 ### M-1 — Anti-snipe cap is per-swap only; trivially bypassed
 
 **Where:** `AntiSnipeMechanism._checkAntiSnipe` (src/mechanisms/AntiSnipeMechanism.sol:40-58).
