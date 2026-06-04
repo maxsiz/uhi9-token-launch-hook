@@ -135,6 +135,17 @@ unbounded share — defeating M1's stated purpose. `tx.origin` is used elsewhere
 each in-window buy), or per-block-per-origin, and cap the cumulative amount. Document the residual
 multi-EOA/sybil limitation.
 
+**Decision (2026-06-04): document-only — no code change.** M1 intentionally stays stateless per spec
+`A6` (the per-EOA cooldown / cumulative accounting was dropped for zero-SSTORE cost). The control is
+therefore re-scoped honestly: M1 is a **naive-bot speed bump** that bounds a *single* swap, not
+cumulative acquisition. It does **not** stop a sniper who (1) bundles N max-buys in one tx via a
+contract (constant `tx.origin`), (2) sends many txs across the window, or (3) splits across sybil EOAs.
+The actual economic deterrent against early sniping in this stack is **M2's decaying buy-tax**; a
+deployer wanting tighter limits should pair a small `maxBuyAmountIn` and short `antiSnipeDuration` with
+M2. This residual is accepted and surfaced to integrators (spec M1 section updated to match). If a hard
+cumulative cap is ever required, escalate to the per-`(pid, tx.origin)` accounting above (costs
+statelessness; sybil still residual).
+
 ### M-2 — `beforeSwapReturnDelta` / `afterSwapReturnDelta` permissions enabled but unused
 
 **Where:** `getHookPermissions` (src/TokenLaunchHook.sol:70-71); flags also baked into the mined salt
