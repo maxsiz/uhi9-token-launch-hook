@@ -164,6 +164,18 @@ path to relax it. Self-inflicted (deployer's own config and own funds), but a sh
 **Severity: Low.** **Remediation:** validate at init that an AND lock is satisfiable, or allow
 post-launch relaxation, or clearly document the irreversibility.
 
+**Decision (2026-06-04): document-only.** Implemented on branch `task_016-l1-doc-l2-volume-fix`. Rationale
+for not changing code: (a) the only configs that trap *permanently* are those whose unlock **requires**
+the volume condition (`volume-only`, or `AND` with `volumeEnabled`) with an unreachable threshold — time
+always eventually passes; (b) "allow post-launch relaxation" is rejected — it would let a deployer who
+promised a long lock pull liquidity right after `launchEndTime`, breaking the trader-facing post-launch
+freeze (a rug vector); (c) "validate satisfiability at init" can bound `unlockTime` but **cannot** judge
+volume reachability (depends on future trading), so it doesn't actually fix the `AND`+volume trap without
+forbidding the feature; (d) the harm is purely self-inflicted (the deployer's own LP — locked liquidity
+is, if anything, pro-trader), making a feature-restricting structural fix disproportionate for a Low.
+A `@dev` warning was added to `_initLock` and a deployer-facing note to the spec (M3); recommend `OR`+time
+with volume as an early-release bonus.
+
 ### L-2 — `cumulativeVolume` overflow reverts `_afterSwap` → swap DoS; and tracking never stops
 
 **Where:** `LiquidityLockMechanism._trackVolume` (src/mechanisms/LiquidityLockMechanism.sol:90-94);
@@ -176,6 +188,16 @@ for the pool's lifetime even after the lock is satisfied — perpetual avoidable
 
 **Severity: Low / Informational.** **Remediation:** saturate at `type(uint128).max` instead of
 reverting; short-circuit tracking once `_isUnlocked(pid)` (or after launch end if volume condition met).
+
+**Decision (2026-06-04): fixed.** Implemented on branch `task_016-l1-doc-l2-volume-fix`. `_trackVolume`
+now: (1) returns early when `!volumeEnabled` (time-only locks never track — no perpetual SSTORE); (2)
+returns early once `cumulativeVolume >= unlockVolumeThreshold` (bounds growth — the gas win and a natural
+overflow guard); (3) computes the add in `uint256` and **saturates** at `type(uint128).max` instead of
+the checked `+=`, so an overflow can never revert `_afterSwap` / DoS swaps. Chose the threshold
+short-circuit over `_isUnlocked` (simpler, and the only case where volume keeps growing is an unmet
+threshold). Regressions added to `test/mechanisms/LiquidityLockMechanism.t.sol`
+(`test_volume_notTracked_whenVolumeDisabled`, `_stopsAccumulating_afterThresholdMet`,
+`_saturates_insteadOfOverflowRevert`). Full suite green (123 passed).
 
 ### I-1 — `tx.origin`-based authorization (documented limitation)
 

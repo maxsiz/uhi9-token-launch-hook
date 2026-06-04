@@ -129,6 +129,40 @@ contract LiquidityLockMechanismTest is Test {
         assertEq(h.cumulativeVolumeOf(pid), 90);
     }
 
+    // --- L-2 regressions: short-circuit + saturating add ---
+
+    /// Volume tracking is skipped entirely when the lock has no volume condition (no perpetual SSTORE).
+    function test_volume_notTracked_whenVolumeDisabled() public {
+        // Time-only lock: timeEnabled, volumeEnabled = false.
+        h.initLock(pid, _cfg(LiquidityLockMechanism.UnlockLogic.AND, true, false, launchEndTime, 0), launchEndTime);
+        h.trackVolume(pid, _pairDelta(int128(1_000)), TOKEN_IS_C0);
+        assertEq(h.cumulativeVolumeOf(pid), 0, "volume tracked despite volumeEnabled=false");
+    }
+
+    /// Once the threshold is reached, accumulation stops (bounds growth → no perpetual SSTORE / overflow).
+    function test_volume_stopsAccumulating_afterThresholdMet() public {
+        h.initLock(pid, _defaultCfg(), launchEndTime); // THRESHOLD = 100 ether
+        h.trackVolume(pid, _pairDelta(int128(uint128(THRESHOLD))), TOKEN_IS_C0); // exactly meets
+        assertEq(h.cumulativeVolumeOf(pid), THRESHOLD);
+        h.trackVolume(pid, _pairDelta(int128(50 ether)), TOKEN_IS_C0); // further volume ignored
+        assertEq(h.cumulativeVolumeOf(pid), THRESHOLD, "kept accumulating past threshold");
+    }
+
+    /// The add saturates at type(uint128).max instead of reverting (an overflow in _afterSwap would DoS swaps).
+    function test_volume_saturates_insteadOfOverflowRevert() public {
+        // Threshold at max so the threshold short-circuit never fires before we test saturation.
+        h.initLock(
+            pid,
+            _cfg(LiquidityLockMechanism.UnlockLogic.AND, true, true, launchEndTime, type(uint128).max),
+            launchEndTime
+        );
+        int128 big = type(int128).max; // ~1.7e38 per track
+        h.trackVolume(pid, _pairDelta(big), TOKEN_IS_C0);
+        h.trackVolume(pid, _pairDelta(big), TOKEN_IS_C0); // cumulative ≈ 2^128 - 2, still < max
+        h.trackVolume(pid, _pairDelta(big), TOKEN_IS_C0); // would overflow → must saturate, not revert
+        assertEq(h.cumulativeVolumeOf(pid), type(uint128).max, "did not saturate at uint128 max");
+    }
+
     // -------------------------------------------------------------------
     // Unlock logic
     // -------------------------------------------------------------------

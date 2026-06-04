@@ -52,6 +52,15 @@ abstract contract LiquidityLockMechanism is GovernanceModule {
     // Bootstrap
     // -----------------------------------------------------------------------
 
+    /// @dev WARNING (audit L-1, accepted self-inflicted risk): all relaxation setters below are gated by
+    ///      `onlyGovernance`, which reverts once `block.timestamp >= launchEndTime`. After launch end the
+    ///      config is frozen, so a lock that *requires* the volume condition — `volume-only`, or `AND`
+    ///      with `volumeEnabled` — and whose `unlockVolumeThreshold` organic trading never reaches becomes
+    ///      **permanently** unsatisfiable, trapping the deployer's own governance LP forever. Time is the
+    ///      only condition guaranteed to eventually pass. Deployers who are unsure should use `OR` logic
+    ///      with `timeEnabled` (always eventually releasable) and treat volume as an early-release bonus.
+    ///      This harms only the deployer's own funds (locked liquidity is, if anything, pro-trader), so it
+    ///      is documented rather than code-restricted — see tasks/TokenLaunchHook.md M3 notes.
     function _initLock(PoolId pid, LiquidityLockConfig memory cfg, uint64 launchEndTime) internal {
         if (!cfg.timeEnabled && !cfg.volumeEnabled) revert NoConditionsEnabled(); // L4
         if (cfg.timeEnabled && cfg.unlockTime < launchEndTime) revert UnlockTimeBeforeLaunchEnd(); // L11
@@ -87,10 +96,21 @@ abstract contract LiquidityLockMechanism is GovernanceModule {
     // Volume tracking (called from the hook's _afterSwap)
     // -----------------------------------------------------------------------
 
+    /// @dev Audit L-2: short-circuit + saturate. Volume only drives the unlock while `volumeEnabled`
+    ///      and below the threshold; past either point further tracking is useless, so we skip the
+    ///      SSTORE (no perpetual per-swap gas). The add saturates at `type(uint128).max` instead of
+    ///      reverting — this runs in `_afterSwap`, so a checked-overflow revert would DoS every swap.
     function _trackVolume(PoolId pid, BalanceDelta delta, bool tokenIsCurrency0) internal {
+        LiquidityLockConfig storage cfg = _lockConfigs[pid];
+        if (!cfg.volumeEnabled) return;
+
+        uint128 current = _lockStates[pid].cumulativeVolume;
+        if (current >= cfg.unlockVolumeThreshold) return; // threshold met — stop accumulating
+
         int128 pairAmount = tokenIsCurrency0 ? delta.amount1() : delta.amount0();
         uint128 absVol = uint128(uint256(int256(pairAmount < 0 ? -pairAmount : pairAmount)));
-        _lockStates[pid].cumulativeVolume += absVol;
+        uint256 sum = uint256(current) + absVol;
+        _lockStates[pid].cumulativeVolume = sum > type(uint128).max ? type(uint128).max : uint128(sum);
     }
 
     // -----------------------------------------------------------------------
