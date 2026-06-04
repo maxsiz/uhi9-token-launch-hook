@@ -46,9 +46,11 @@ abstract contract TokenLaunchHookTestBase is PosmTestSetup {
         deployMintAndApprove2Currencies();
         _deployPosm();
 
+        // Must match getHookPermissions() exactly (BaseHook validates address bits at construction).
+        // v1 declares no return-delta flags (audit M-2).
         uint160 flags = uint160(
             Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG
-                | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG
+                | Hooks.AFTER_SWAP_FLAG
         );
 
         bytes memory args = abi.encode(manager, address(lpm));

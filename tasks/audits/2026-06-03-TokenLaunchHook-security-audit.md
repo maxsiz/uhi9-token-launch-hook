@@ -152,6 +152,14 @@ audit and the attack surface if any future inherited code returns a non-zero del
 matching `BEFORE/AFTER_SWAP_RETURNS_DELTA_FLAG` from `HookDeployLib.hookFlags()`, re-mine the salt.
 Re-enable only in the v2 deployment that actually uses them.
 
+**Decision (2026-06-04): fixed.** Implemented on branch `task_015-m2-drop-returndelta-flags`. Both flags
+set to `false` in `getHookPermissions()` and dropped from `HookDeployLib.hookFlags()`; the test base's
+mining flags were updated in lockstep (all three must match or `BaseHook`'s constructor
+`validateHookAddress` reverts). No salt artifact is stored — both `DeployStack` and the tests mine via
+`HookMiner.find` at runtime, so the re-mine is automatic. `_beforeSwap`/`_afterSwap` already returned
+zero, so no callback code changed. Full suite green (120 passed). v2 (M6/M7/M8) re-adds the flags in its
+own fresh deployment, which non-upgradeability requires regardless.
+
 ### L-1 — Misconfigured M3 lock can permanently trap the deployer's own LP
 
 **Where:** `LiquidityLockMechanism` + `onlyGovernance` time gate.
