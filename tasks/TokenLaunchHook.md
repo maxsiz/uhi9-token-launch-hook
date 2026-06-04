@@ -813,7 +813,7 @@ So `uint256(params.salt)` in our hook callbacks reliably gives the corresponding
 
 ### Purpose
 
-Prevent sniper bots from grabbing huge portions of token supply in the first N seconds after launch by capping per-TX buy size during a configurable time window. Sells are unrestricted.
+Blunt **naive** snipers by capping **per-TX** buy size during a configurable time window after launch. Sells are unrestricted. This is a speed bump, not a cumulative-acquisition limit — see *Known limitation* below; the real economic deterrent against early sniping is M2's decaying buy-tax.
 
 ### Configuration (1 slot per pool, immutable post-bootstrap)
 
@@ -934,6 +934,7 @@ test_buy_afterWindowExpires_unrestricted
 - **Window precision**: `block.timestamp` granularity. On L1 ~12s blocks, MAX 1 day → window valid for ~7200 blocks. On L2 sub-second blocks, much finer granularity.
 - **`tokenIsCurrency0` semantics**: `zeroForOne != tokenIsCurrency0` returns `true` iff swap is BUY of our launched token. Proof: if `tokenIsCurrency0=true` and `zeroForOne=false`, we're paying currency1 (pair) to receive currency0 (token) → BUY. Matches the XOR formula.
 - **No state writes** → zero gas overhead from SSTOREs. Only SLOADs for config check.
+- **Known limitation (residual risk; audit M-1).** The cap bounds a **single swap**, not cumulative buys. Because no per-origin/per-tx accounting is kept (the per-EOA cooldown was dropped — `A6` — for statelessness), a sniper acquires an unbounded share by (1) bundling N max-buys in one tx via a contract (same `tx.origin`), (2) sending many txs across the window, or (3) splitting across sybil EOAs. M1 only deters naive single-buy bots. **Rely on M2's decaying buy-tax as the economic deterrent**, and pair a small `maxBuyAmountIn` + short `antiSnipeDuration` with it. A hard cumulative cap would require per-`(pid, tx.origin)` accounting (costs statelessness; sybil still residual) — deliberately out of v1 scope.
 
 ## M2 BuySellTaxMechanism — Finalized Spec
 
