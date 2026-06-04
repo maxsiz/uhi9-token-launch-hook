@@ -6,6 +6,7 @@ import {BaseHook} from "v4-hooks-public/src/base/BaseHook.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
@@ -46,6 +47,7 @@ contract TokenLaunchHook is
     error WrongInitPrice();
     error WrongFirstLP();
     error TaxRequiresDynamicFee();
+    error ZeroLaunchedTokenLiquidity();
 
     event CampaignLaunched(PoolId indexed pid, address indexed deployer, MechanismConfig.EnabledMechanisms enabled);
 
@@ -113,6 +115,14 @@ contract TokenLaunchHook is
 
         // Anti-sandwich: only the deployer's own transaction may seed the launch.
         if (tx.origin != cfg.deployer) revert WrongFirstLP();
+
+        // H-1 mitigation (audit 2026-06-03, option A): the governance mint must contribute launched-token
+        // liquidity, so the pool cannot be captured for free with pair-only single-sided liquidity. A
+        // position holds the launched token unless the price sits entirely on the opposite side of its range.
+        bool launchedPresent = cfg.tokenIsCurrency0
+            ? sqrtPriceNow < TickMath.getSqrtPriceAtTick(params.tickUpper)
+            : sqrtPriceNow > TickMath.getSqrtPriceAtTick(params.tickLower);
+        if (!launchedPresent) revert ZeroLaunchedTokenLiquidity();
 
         // Dynamic-fee pool is required when the tax module overrides the LP fee.
         if (cfg.enabled.tax && !key.fee.isDynamicFee()) revert TaxRequiresDynamicFee();
