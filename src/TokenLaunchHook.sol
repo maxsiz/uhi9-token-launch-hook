@@ -69,8 +69,8 @@ contract TokenLaunchHook is
             afterRemoveLiquidity: false,
             beforeSwap: true, // anti-snipe + tax (fee override) + whitelist
             afterSwap: true, // M3 volume tracking
-            beforeSwapReturnDelta: true, // v2: bonding curve fallback (M6)
-            afterSwapReturnDelta: true, // v2: treasury fee routing (M8) + auto-buyback (M7)
+            beforeSwapReturnDelta: false, // v1 returns ZERO_DELTA; re-enable in the v2 deployment that uses it (M6)
+            afterSwapReturnDelta: false, // v1 returns 0; re-enable in the v2 deployment that uses it (M8 treasury / M7 buyback)
             afterAddLiquidityReturnDelta: false,
             afterRemoveLiquidityReturnDelta: false,
             beforeDonate: false,

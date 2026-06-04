@@ -27,9 +27,11 @@ library HookDeployLib {
 
     /// @notice Permission flags encoded into the hook's address; MUST equal `getHookPermissions()`.
     function hookFlags() internal pure returns (uint160) {
+        // Must equal getHookPermissions() exactly. v1 uses no return-delta paths, so those flags are
+        // omitted (audit M-2); re-add them only in the v2 deployment that implements M6/M7/M8.
         return uint160(
             Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG
-                | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_SWAP_RETURNS_DELTA_FLAG | Hooks.AFTER_SWAP_RETURNS_DELTA_FLAG
+                | Hooks.AFTER_SWAP_FLAG
         );
     }
 
