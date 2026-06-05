@@ -22,6 +22,9 @@ mainnet = { key = "${ETHERSCAN_TOKEN}" }
 optimism = { key = "${API_KEY_OPTIMISTIC_ETHERSCAN}" }
 polygon = { key = "${POLYGONSCAN_TOKEN}" }
 sepolia = { key = "${ETHERSCAN_TOKEN}" }
+unichain = { key = "${ETHERSCAN_TOKEN}" }
+unichain-sepolia = { key = "${ETHERSCAN_TOKEN}" }
+base = { key = "${ETHERSCAN_TOKEN}" }
 
 [rpc_endpoints]
 arbitrum = "https://burned-hardworking-dust.arbitrum-mainnet.quiknode.pro/${WEB3_QUICKNODE_ID}/"
@@ -29,3 +32,4 @@ localhost = "http://localhost:8545"
 mainnet = "${ENVELOP_MAINNET}"
 base = "https://base-mainnet.core.chainstack.com/${CHAIN_STACK_ID}"
 unichain = "https://falling-spring-energy.unichain-mainnet.quiknode.pro/${WEB3_QUICKNODE_UNI}/"
+unichain-sepolia = "https://skilled-proud-wildflower.unichain-sepolia.quiknode.pro/${WEB3_QUICKNODE_UNI_SEP}/"
