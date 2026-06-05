@@ -11,6 +11,7 @@ import {HookMiner} from "v4-hooks-public/src/utils/HookMiner.sol";
 
 import {TokenLaunchHook} from "../src/TokenLaunchHook.sol";
 import {CampaignWrapper} from "../src/CampaignWrapper.sol";
+import {CampaignLens} from "../src/CampaignLens.sol";
 import {TokenFactory} from "../src/TokenFactory.sol";
 
 import {HookDeployLib} from "./MineSalt.s.sol";
@@ -19,13 +20,17 @@ import {HookDeployLib} from "./MineSalt.s.sol";
 /// @notice One-shot, per-chain deploy of the launch stack:
 ///         1. mine CREATE2 salt → deploy `TokenLaunchHook` at a permission-flag address,
 ///         2. deploy `TokenFactory` (which deploys the `StandardToken` implementation),
-///         3. deploy the stateless `CampaignWrapper`.
+///         3. deploy the stateless `CampaignWrapper`,
+///         4. deploy the stateless `CampaignLens` (read-only aggregator for frontends).
 /// @dev Idempotent w.r.t. its network inputs: PoolManager/PositionManager/Permit2 come from env
 ///      overrides or the canonical registry in `HookDeployLib`. Both core contracts are
 ///      non-upgradeable — a new version is a fresh deploy at a new address.
 ///      Run: `forge script script/DeployStack.s.sol --sig run() --rpc-url <chain> --broadcast`.
 contract DeployStack is Script {
-    function run() external returns (TokenLaunchHook hook, CampaignWrapper wrapper, TokenFactory factory) {
+    function run()
+        external
+        returns (TokenLaunchHook hook, CampaignWrapper wrapper, TokenFactory factory, CampaignLens lens)
+    {
         (address poolManager, address positionManager, address permit2) = HookDeployLib.resolveNetwork();
 
         // Mine the salt off the broadcast so the predicted address is known up front.
@@ -35,6 +40,7 @@ contract DeployStack is Script {
         hook = new TokenLaunchHook{salt: salt}(IPoolManager(poolManager), positionManager);
         factory = new TokenFactory();
         wrapper = new CampaignWrapper(IPositionManager(positionManager), hook, factory, IAllowanceTransfer(permit2));
+        lens = new CampaignLens(hook, IPositionManager(positionManager));
         vm.stopBroadcast();
 
         // The deployed hook must land at the mined address with exactly the declared permission flags,
@@ -51,6 +57,7 @@ contract DeployStack is Script {
         console2.log("Permit2        ", permit2);
         console2.log("TokenLaunchHook", address(hook));
         console2.log("CampaignWrapper", address(wrapper));
+        console2.log("CampaignLens   ", address(lens));
         console2.log("TokenFactory   ", address(factory));
         console2.log("StandardToken  ", factory.TOKEN_IMPLEMENTATION());
     }
