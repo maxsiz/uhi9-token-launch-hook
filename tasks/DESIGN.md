@@ -94,6 +94,7 @@ web/
     providers.tsx              # "use client": WagmiProvider, QueryClientProvider, RainbowKitProvider
     launch/page.tsx            # Launch Wizard host (step machine)
     governance/page.tsx        # Governance Dashboard (pool lookup + actions)
+    swap/[chainId]/[pid]/page.tsx # Per-campaign Uniswap-style swap widget (fallback to Uniswap UI) — see task_019 (#19)
     api/rpc/route.ts           # OPTIONAL server-side RPC proxy (keeps paid RPC keys off client)
   components/
     ConnectGate.tsx            # Connect / wrong-chain / SCW-warning gating around onchain actions
@@ -112,6 +113,8 @@ web/
       TaxPanel.tsx             # effective/initial/base tax; setBuyTaxOverride/setSellTaxOverride
       LockPanel.tsx            # lockConfigOf + relax/disable/switchToOr; isUnlocked + volume
       WhitelistPanel.tsx       # whitelistConfigOf + add/addMany/remove/relaxEnd; isAddressWhitelisted
+    swap/                      # Per-campaign trade widget (task_019 #19): SwapWidget + quote/route via Universal Router
+      SwapWidget.tsx           # Uniswap-style swap UI; reads campaign via CampaignLens (#18), hookData = 0x
     hook/                      # DEMO: Hook Transparency Layer (§5)
       HookBadge.tsx            # small chip: callback + mechanism a control exercises
       HookExplainer.tsx        # popover: what the hook does for this control, on-chain
@@ -452,9 +455,13 @@ config sub-forms. "Custom" exposes all four toggles.
 
 ## 11. Out of Scope / Future
 
-- **Trading / swap UI** against the launched pool (use Uniswap's own UI or the v4 swap SDK later).
-- **Indexer / subgraph discovery feed** ("browse launches") — needs event indexing (The Graph / Ponder).
-  For v1, users keep their own `pid`/links from the launch event.
+- **Trading / swap UI** — primary path is Uniswap's own UI; a per-campaign **fallback** Uniswap-style swap
+  widget (`/swap/[chainId]/[pid]`, via Universal Router + Quoter + Permit2) is specced in **task_019 (#19)**
+  for when a custom-hook pool is not tradeable in the Uniswap interface.
+- **Indexer / subgraph discovery feed** ("browse launches") — primary discovery uses Uniswap's hosted v4
+  subgraph (mainnets) + Alchemy NFT API fallback, specced in **task_018 (#18)**; running our own indexer
+  stays out of scope. Note: `unichain-sepolia` is present in the v4-subgraph `networks.json`, but a hosted
+  testnet endpoint may not exist — self-deploy in The Graph Studio or use the Alchemy fallback there.
 - **Keeper bot** — any automated post-launch actions are off-chain infra, not frontend.
 - **Smart-contract-wallet launch support** — blocked by the `tx.origin` anti-sandwich check; would
   require contract changes.
