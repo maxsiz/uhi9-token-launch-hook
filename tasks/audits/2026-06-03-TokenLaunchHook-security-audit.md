@@ -10,15 +10,19 @@ code compiles and the existing test suite passes per repo.
 
 ## Severity summary
 
-| ID  | Severity | Title |
-|-----|----------|-------|
-| H-1 | High     | Bootstrap hijack / DoS of existing-token pools (front-runnable first mint) |
-| M-1 | Medium   | Anti-snipe cap is per-swap only; trivially bypassed |
-| M-2 | Medium   | `beforeSwapReturnDelta`/`afterSwapReturnDelta` permissions enabled but unused |
-| L-1 | Low      | Misconfigured M3 lock can permanently trap the deployer's own LP |
-| L-2 | Low      | `cumulativeVolume` overflow reverts `_afterSwap` → swap DoS; tracking never stops |
-| I-1 | Info     | `tx.origin`-based authorization (documented limitation) |
-| I-2 | Info     | Code hygiene (leftover TODOs, unbounded whitelist loops) |
+| ID  | Severity | Status | Title |
+|-----|----------|--------|-------|
+| H-1 | High     | ✅ Fixed (`#13`) | Bootstrap hijack / DoS of existing-token pools (front-runnable first mint) |
+| M-1 | Medium   | 📝 Documented (`#14`) | Anti-snipe cap is per-swap only; trivially bypassed |
+| M-2 | Medium   | ✅ Fixed (`#15`) | `beforeSwapReturnDelta`/`afterSwapReturnDelta` permissions enabled but unused |
+| L-1 | Low      | 📝 Documented (`#16`) | Misconfigured M3 lock can permanently trap the deployer's own LP |
+| L-2 | Low      | ✅ Fixed (`#16`) | `cumulativeVolume` overflow reverts `_afterSwap` → swap DoS; tracking never stops |
+| I-1 | Info     | 📝 Documented | `tx.origin`-based authorization (documented limitation) |
+| I-2 | Info     | ⬜ Open | Code hygiene (leftover TODOs, unbounded whitelist loops) |
+
+**Status legend:** ✅ Fixed (code change, merged to master) · 📝 Documented (deliberate decision, no
+code change — see the finding's *Decision* note) · ⬜ Open (not yet actioned). Resolutions landed
+2026-06-04 (`#13`–`#16`), all merged to master. I-2 (code hygiene) remains the only outstanding item.
 
 ---
 
