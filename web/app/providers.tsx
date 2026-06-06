@@ -19,7 +19,9 @@ const config = burner
     // WalletConnect (mobile) is included when a project id is set.
     getDefaultConfig({
       appName: "TokenLaunchHook Studio",
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "DEMO_PROJECT_ID",
+      // `||` (not `??`) so a blank env var also falls back — RainbowKit throws on an empty projectId.
+      // The placeholder lets injected wallets (MetaMask/Rabby) work; WalletConnect needs a real id.
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "DEMO_PROJECT_ID",
       chains: SUPPORTED_CHAINS,
       transports,
       ssr: true,
