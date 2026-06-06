@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, usePublicClient, useSignTypedData, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { maxUint256, parseEventLogs, type Address, type Hex } from "viem";
 
-import { CampaignWrapperAbi, Erc20Abi, TokenFactoryAbi } from "@/lib/config/abi";
+import { CampaignWrapperAbi, Erc20Abi, Permit2Abi, TokenFactoryAbi } from "@/lib/config/abi";
 import { CONTRACTS } from "@/lib/config/contracts.generated";
 import { PERMIT2 } from "@/lib/config/uniswap";
 import { type SupportedChainId } from "@/lib/config/chains";
 import { prepareLaunch, type LaunchFormInput } from "./launch";
-import { buildPermitData } from "./permit2";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
+const MAX_UINT160 = (1n << 160n) - 1n;
+const PERMIT2_EXPIRATION_SECS = 60 * 60 * 24 * 30;
 
 export interface WizardForm {
   tokenMode: "new" | "existing";
@@ -33,7 +34,6 @@ export function useLaunch(chainId: SupportedChainId) {
   const { address } = useAccount();
   const client = usePublicClient({ chainId });
   const { writeContractAsync } = useWriteContract();
-  const { signTypedDataAsync } = useSignTypedData();
   const [stage, setStage] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<{ pid: Hex; hash: Hex } | undefined>();
@@ -98,20 +98,14 @@ export function useLaunch(chainId: SupportedChainId) {
 
     const prepared = prepareLaunch(input, Math.floor(Date.now() / 1000));
 
-    // 2) Permit2: approve each ERC-20 side, then sign a batch granting the wrapper its pull allowance.
-    let permitData: Hex = "0x";
-    if (prepared.permitTokens.length > 0) {
-      for (const t of prepared.permitTokens) await approvePermit2IfNeeded(t.token, t.amount);
-      setStage("Signing Permit2 batch");
-      permitData = await buildPermitData({
-        owner: address,
-        spender: wrapper,
-        chainId,
-        permit2: PERMIT2,
-        tokens: prepared.permitTokens,
-        publicClient: client,
-        signTypedData: signTypedDataAsync as never,
-      });
+    // 2) Permit2 allowance for each ERC-20 side: token → Permit2, then Permit2 → wrapper (direct, no
+    //    signature). The wrapper pulls via Permit2.transferFrom, so permitData stays "0x".
+    const expiration = Math.floor(Date.now() / 1000) + PERMIT2_EXPIRATION_SECS;
+    for (const t of prepared.permitTokens) {
+      await approvePermit2IfNeeded(t.token, t.amount);
+      setStage(`Enabling ${t.token.slice(0, 8)}… on the launcher`);
+      const gh = await writeContractAsync({ chainId, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
+      await client.waitForTransactionReceipt({ hash: gh });
     }
 
     // 3) simulate → write → wait
@@ -121,7 +115,7 @@ export function useLaunch(chainId: SupportedChainId) {
       address: wrapper,
       abi: CampaignWrapperAbi,
       functionName: "launchCampaign",
-      args: [prepared.params, permitData],
+      args: [prepared.params, "0x"],
       value: prepared.value,
     });
     setStage("Launching campaign");

@@ -26,6 +26,8 @@ async function main() {
   const wallet = createWalletClient({ account, chain: unichainSepolia, transport });
   const { wrapper, lens } = CONTRACTS[unichainSepolia.id];
 
+  // Top up ETH — an OP-stack fork charges a large simulated L1 fee per tx, so fund generously.
+  await pub.request({ method: "anvil_setBalance" as never, params: [account.address, "0xd3c21bcecceda1000000"] as never }); // 1e24 wei
   console.log("deployer (foundry #0):", account.address);
   console.log("ETH balance:", (await pub.getBalance({ address: account.address })).toString());
 
