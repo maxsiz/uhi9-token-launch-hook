@@ -37,6 +37,9 @@ contract DeployStack is Script {
         (address predicted, bytes32 salt) = HookDeployLib.mineSalt(poolManager, positionManager);
 
         vm.startBroadcast();
+        console2.log("sender          ", msg.sender);
+        console2.log("sender balance: ", address(msg.sender).balance);
+        console2.log("block:          ", block.number);
         hook = new TokenLaunchHook{salt: salt}(IPoolManager(poolManager), positionManager);
         factory = new TokenFactory();
         wrapper = new CampaignWrapper(IPositionManager(positionManager), hook, factory, IAllowanceTransfer(permit2));
