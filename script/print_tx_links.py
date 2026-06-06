@@ -25,9 +25,9 @@ EXPLORERS = {
 
 # Lifecycle transactions, in order: (label, function-name prefix in the broadcast artifact).
 STEPS = [
-    ("Создание кампании (launchCampaign)", "launchCampaign("),
-    ("Изменение кампании (addToWhitelist)", "addToWhitelist("),
-    ("Обмен в пуле (swap)", "swap("),
+    ("Campaign create (launchCampaign)", "launchCampaign("),
+    ("Campaign change (addToWhitelist)", "addToWhitelist("),
+    ("Swap (swap)", "swap("),
 ]
 
 SCRIPT = "ModelCampaign.s.sol"
