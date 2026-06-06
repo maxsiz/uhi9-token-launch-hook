@@ -157,4 +157,12 @@ abstract contract GovernanceModule {
         if (block.timestamp < state.launchEndTime) return 1;
         return 2;
     }
+
+    /// @notice Full governance state for a pool in one read (tokenId, launch window, orientation,
+    ///         deployer, initialized). Exposes the `launchTime`/`launchEndTime`/`tokenIsCurrency0`/
+    ///         `deployer` fields that the granular getters above omit, so off-chain readers (e.g.
+    ///         `CampaignLens`) can reconstruct a campaign card without parsing bootstrap events.
+    function governanceInfoOf(PoolId pid) external view returns (GovernanceState memory) {
+        return _governance[pid];
+    }
 }

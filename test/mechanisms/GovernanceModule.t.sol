@@ -67,6 +67,26 @@ contract GovernanceModuleTest is Test {
         assertEq(gov.launchPhaseOf(pid), 1);
     }
 
+    function test_governanceInfoOf_returnsFullState() public {
+        uint256 tokenId = _bootstrap(alice, DURATION);
+
+        GovernanceModule.GovernanceState memory s = gov.governanceInfoOf(pid);
+        assertEq(s.tokenId, tokenId);
+        assertEq(s.launchTime, launchTime);
+        assertEq(s.launchEndTime, launchTime + DURATION);
+        assertTrue(s.initialized);
+        assertTrue(s.tokenIsCurrency0);
+        assertEq(s.deployer, deployer);
+    }
+
+    function test_governanceInfoOf_uninitialized_isZero() public view {
+        GovernanceModule.GovernanceState memory s = gov.governanceInfoOf(PoolId.wrap(keccak256("never")));
+        assertFalse(s.initialized);
+        assertEq(s.tokenId, 0);
+        assertEq(s.launchEndTime, 0);
+        assertEq(s.deployer, address(0));
+    }
+
     function test_init_nonPosM_reverts() public {
         uint256 tokenId = posm.mint(alice);
         vm.expectRevert(GovernanceModule.MustUsePositionManager.selector);
