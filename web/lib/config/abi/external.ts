@@ -102,6 +102,28 @@ export const V4QuoterAbi = [
   },
 ] as const;
 
+/** TokenFactory subset: deploy a fresh StandardToken clone (mints supply to `recipient`). */
+export const TokenFactoryAbi = [
+  {
+    type: "function",
+    name: "deployToken",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "cfg",
+        type: "tuple",
+        components: [
+          { name: "name", type: "string" },
+          { name: "symbol", type: "string" },
+          { name: "totalSupply", type: "uint256" },
+        ],
+      },
+      { name: "recipient", type: "address" },
+    ],
+    outputs: [{ name: "token", type: "address" }],
+  },
+] as const;
+
 /** UniversalRouter subset: the `execute(commands, inputs, deadline)` entry point. */
 export const UniversalRouterAbi = [
   {

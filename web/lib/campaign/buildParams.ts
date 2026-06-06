@@ -4,7 +4,7 @@
  * so those are left zero/false here (DESIGN.md §4.3).
  */
 import type { Address } from "viem";
-import { DYNAMIC_FEE_FLAG } from "@/lib/config/uniswap";
+import { DYNAMIC_FEE_FLAG } from "../config/uniswap";
 import { UnlockLogic, type CampaignParams, type EnabledMechanisms, type LaunchConfig } from "./types";
 import type { MintMathOutput } from "./priceMath";
 

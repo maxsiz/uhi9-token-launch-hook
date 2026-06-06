@@ -1,57 +1,166 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useAccount, useChainId } from "wagmi";
+import { parseUnits, type Address } from "viem";
+
 import { PRESETS, type PresetId } from "@/lib/campaign/presets";
 import type { EnabledMechanisms } from "@/lib/campaign/types";
 import { hookPlan } from "@/lib/hook/hookMap";
 import { HookExplainer } from "@/components/hook/HookExplainer";
 import { HookBadge } from "@/components/hook/HookBadge";
+import { isSupportedChain, EXPLORER, type SupportedChainId } from "@/lib/config/chains";
+import { prepareLaunch, type LaunchFormInput } from "@/lib/campaign/launch";
+import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
+import { formatAmount, truncateAddress } from "@/lib/format";
 
 const STEPS = ["Token", "Pool & price", "Mechanisms", "Review", "Sign"] as const;
 type StepIndex = 0 | 1 | 2 | 3 | 4;
-
-const FEATURE_OF: Record<keyof EnabledMechanisms, "antiSnipe" | "tax" | "lock" | "whitelist"> = {
-  antiSnipe: "antiSnipe",
-  tax: "tax",
-  lock: "lock",
-  whitelist: "whitelist",
-};
+const FEATURES: (keyof EnabledMechanisms)[] = ["antiSnipe", "tax", "lock", "whitelist"];
+const ZERO = "0x0000000000000000000000000000000000000000" as Address;
 
 export function LaunchWizard() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const supported = isSupportedChain(chainId);
+
   const [step, setStep] = useState<StepIndex>(0);
-  const [presetId, setPresetId] = useState<PresetId>("memecoin");
-  const [enabled, setEnabled] = useState<EnabledMechanisms>(PRESETS[0].enabled);
+  const [presetId, setPresetId] = useState<PresetId>("custom");
+  const [enabled, setEnabled] = useState<EnabledMechanisms>({ antiSnipe: false, tax: false, lock: false, whitelist: false });
+
+  // form state
+  const [tokenMode, setTokenMode] = useState<"new" | "existing">("new");
+  const [name, setName] = useState("Demo Token");
+  const [symbol, setSymbol] = useState("DEMO");
+  const [supplyStr, setSupplyStr] = useState("1000000");
+  const [existingToken, setExistingToken] = useState("");
+  const [existingDecimals, setExistingDecimals] = useState("18");
+  const [pairMode, setPairMode] = useState<"native" | "erc20">("native");
+  const [pairAddress, setPairAddress] = useState("");
+  const [pairDecimals, setPairDecimals] = useState("6");
+  const [seedToken, setSeedToken] = useState("100000");
+  const [seedPair, setSeedPair] = useState("0.05");
+  const [durationDays, setDurationDays] = useState("1");
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
+  const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
 
   function choosePreset(id: PresetId) {
     setPresetId(id);
-    const p = PRESETS.find((x) => x.id === id)!;
-    setEnabled(p.enabled);
+    setEnabled(PRESETS.find((x) => x.id === id)!.enabled);
   }
   function toggle(k: keyof EnabledMechanisms) {
     setPresetId("custom");
     setEnabled((e) => ({ ...e, [k]: !e[k] }));
   }
 
+  const form: WizardForm = {
+    tokenMode,
+    name,
+    symbol,
+    totalSupply: (() => {
+      try {
+        return parseUnits(supplyStr || "0", 18);
+      } catch {
+        return 0n;
+      }
+    })(),
+    existingToken: (existingToken || ZERO) as Address,
+    existingTokenDecimals: Number(existingDecimals) || 18,
+    pairMode,
+    pairAddress: (pairAddress || ZERO) as Address,
+    pairDecimals: Number(pairDecimals) || 18,
+    seedToken,
+    seedPair,
+    durationDays: Number(durationDays) || 1,
+    enabled,
+  };
+
+  // Best-effort preview (orientation for a fresh ERC-20-paired token is only exact post-deploy).
+  const preview = useMemo(() => {
+    try {
+      const input: LaunchFormInput = {
+        newToken: tokenMode === "new" ? { name, symbol, totalSupply: form.totalSupply } : undefined,
+        existingToken: tokenMode === "existing" ? (existingToken as Address) : undefined,
+        tokenAddress: tokenMode === "existing" ? (existingToken as Address) : undefined,
+        tokenDecimals: tokenMode === "existing" ? Number(existingDecimals) || 18 : 18,
+        pair: pairMode === "native" ? { native: true } : { address: pairAddress as Address, decimals: Number(pairDecimals) || 18 },
+        seedTokenHuman: seedToken,
+        seedPairHuman: seedPair,
+        launchDurationDays: Number(durationDays) || 1,
+        tickSpacing: 60,
+        staticFee: 3000,
+        rangeTicks: 6000,
+        slippageBps: 50,
+        lpRecipient: (address ?? ZERO) as Address,
+        enabled,
+      };
+      return prepareLaunch(input, Math.floor(Date.now() / 1000));
+    } catch {
+      return undefined;
+    }
+  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingDecimals, pairMode, pairAddress, pairDecimals, seedToken, seedPair, durationDays, address, enabled]);
+
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
       <ol className="flex flex-wrap gap-2 text-sm">
         {STEPS.map((label, i) => (
-          <li
-            key={label}
-            className={`rounded-full px-3 py-1 ${
-              i === step ? "bg-blue-600 text-white" : i < step ? "bg-neutral-800 text-neutral-300" : "bg-neutral-900 text-neutral-500"
-            }`}
-          >
+          <li key={label} className={`rounded-full px-3 py-1 ${i === step ? "bg-blue-600 text-white" : i < step ? "bg-neutral-800 text-neutral-300" : "bg-neutral-900 text-neutral-500"}`}>
             {i + 1}. {label}
           </li>
         ))}
       </ol>
 
-      {step === 0 && <PlaceholderStep title="Token" note="Deploy a new ERC-20 (name / symbol / total supply) or paste an existing token address." feature="launch.bootstrap" />}
-      {step === 1 && <PlaceholderStep title="Pool & price" note="Pick the pair (native ETH or ERC-20), the initial price, the seed amounts, and the range. priceMath.ts (v4-sdk) derives sqrtPrice / ticks / liquidity." feature="launch.bootstrap" />}
+      {step === 0 && (
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Token</h3>
+            <HookBadge feature="launch.bootstrap" />
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button className={tokenMode === "new" ? "btn-primary" : "btn-ghost"} onClick={() => setTokenMode("new")}>Deploy new</button>
+            <button className={tokenMode === "existing" ? "btn-primary" : "btn-ghost"} onClick={() => setTokenMode("existing")}>Existing token</button>
+          </div>
+          {tokenMode === "new" ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+              <input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Symbol" />
+              <input className="input" value={supplyStr} onChange={(e) => setSupplyStr(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Total supply" />
+            </div>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="input font-mono" value={existingToken} onChange={(e) => setExistingToken(e.target.value.trim())} placeholder="0x token address" />
+              <input className="input" value={existingDecimals} onChange={(e) => setExistingDecimals(e.target.value)} placeholder="decimals" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Pool &amp; price</h3>
+            <HookBadge feature="launch.bootstrap" />
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button className={pairMode === "native" ? "btn-primary" : "btn-ghost"} onClick={() => setPairMode("native")}>Native ETH</button>
+            <button className={pairMode === "erc20" ? "btn-primary" : "btn-ghost"} onClick={() => setPairMode("erc20")}>ERC-20</button>
+          </div>
+          {pairMode === "erc20" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className="input font-mono" value={pairAddress} onChange={(e) => setPairAddress(e.target.value.trim())} placeholder="0x pair token (e.g. USDC)" />
+              <input className="input" value={pairDecimals} onChange={(e) => setPairDecimals(e.target.value)} placeholder="pair decimals" />
+            </div>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="space-y-1"><span className="text-xs text-neutral-400">Seed token amount</span><input className="input" value={seedToken} onChange={(e) => setSeedToken(e.target.value.replace(/[^0-9.]/g, ""))} /></label>
+            <label className="space-y-1"><span className="text-xs text-neutral-400">Seed pair amount ({pairMode === "native" ? "ETH" : "pair"})</span><input className="input" value={seedPair} onChange={(e) => setSeedPair(e.target.value.replace(/[^0-9.]/g, ""))} /></label>
+          </div>
+          <label className="space-y-1 block"><span className="text-xs text-neutral-400">Launch duration (days, ≥ 1)</span><input className="input" value={durationDays} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} /></label>
+          <p className="text-xs text-neutral-500">Initial price ≈ {Number(seedPair) / Math.max(Number(seedToken), 1e-9)} pair per token (set by the seed ratio).</p>
+        </div>
+      )}
 
       {step === 2 && (
         <div className="space-y-5">
@@ -59,96 +168,92 @@ export function LaunchWizard() {
             <h3 className="font-semibold">Choose a preset</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               {PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => choosePreset(p.id)}
-                  className={`card text-left transition ${presetId === p.id ? "border-blue-600" : "hover:border-neutral-600"}`}
-                >
+                <button key={p.id} onClick={() => choosePreset(p.id)} className={`card text-left transition ${presetId === p.id ? "border-blue-600" : "hover:border-neutral-600"}`}>
                   <div className="font-medium">{p.label}</div>
                   <div className="text-sm text-neutral-400">{p.description}</div>
                 </button>
               ))}
             </div>
           </div>
-
           <div className="space-y-2">
             <h3 className="font-semibold">Mechanisms</h3>
-            {(Object.keys(FEATURE_OF) as (keyof EnabledMechanisms)[]).map((k) => (
+            {FEATURES.map((k) => (
               <label key={k} className="flex items-center gap-3 rounded-lg border border-neutral-800 p-3">
                 <input type="checkbox" checked={enabled[k]} onChange={() => toggle(k)} />
                 <span className="flex-1 capitalize">{k}</span>
-                <HookBadge feature={FEATURE_OF[k]} />
+                <HookBadge feature={k} />
               </label>
             ))}
           </div>
-
-          {/* The demo highlight: which hook callbacks this config will run */}
-          <HookPlan plan={plan} />
+          <div className="card">
+            <h4 className="mb-2 text-sm font-semibold">Hook plan — what runs on-chain</h4>
+            <div className="space-y-2">{plan.map((f) => <HookExplainer key={f.key} feature={f.key} />)}</div>
+          </div>
         </div>
       )}
 
       {step === 3 && (
         <div className="space-y-4">
-          <h3 className="font-semibold">Review — Hook plan</h3>
-          <p className="text-sm text-neutral-400">
-            With this configuration, the following hook callbacks will run on your pool. A
-            <code className="mx-1 font-mono">simulateContract</code> dry-run gates the final sign step.
-          </p>
-          <div className="space-y-2">
-            {plan.map((f) => (
-              <HookExplainer key={f.key} feature={f.key} />
-            ))}
-          </div>
+          <h3 className="font-semibold">Review</h3>
+          {preview ? (
+            <div className="card space-y-1 text-sm">
+              <Row label="Token">{tokenMode === "new" ? `${name} (${symbol}), new` : truncateAddress(existingToken)}</Row>
+              <Row label="Pair">{pairMode === "native" ? "native ETH" : truncateAddress(pairAddress)}</Row>
+              <Row label="Fee">{preview.params.fee === 0x800000 ? "dynamic (tax)" : `${preview.params.fee / 10000}%`}</Row>
+              <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
+              <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
+              <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, 18, 4)} / {formatAmount(preview.params.amount1Max, 18, 4)}</Row>
+              {preview.value > 0n && <Row label="ETH value">{formatAmount(preview.value, 18, 6)}</Row>}
+            </div>
+          ) : (
+            <p className="text-sm text-amber-300">Fill in token, pair and seed amounts to preview the launch.</p>
+          )}
+          <div className="space-y-2">{plan.map((f) => <HookExplainer key={f.key} feature={f.key} />)}</div>
         </div>
       )}
 
       {step === 4 && (
-        <div className="card space-y-2 text-sm">
-          <p className="font-medium">Sign</p>
-          <p className="text-neutral-400">
-            Scaffold: wire <code className="font-mono">priceMath.ts</code>,{" "}
-            <code className="font-mono">buildParams.ts</code> and <code className="font-mono">permit2.ts</code>, then
-            <code className="mx-1 font-mono">simulateContract</code> → <code className="font-mono">writeContract</code>{" "}
-            against <code className="font-mono">CampaignWrapper.launchCampaign</code>. On success the receipt is
-            passed to <code className="font-mono">&lt;HookCallTrace/&gt;</code> to prove the hook ran.
-          </p>
+        <div className="card space-y-3 text-sm">
+          <p className="font-medium">Sign &amp; launch</p>
+          {!supported && <p className="text-amber-300">Connect to a supported chain.</p>}
+          {result ? (
+            <div className="space-y-2">
+              <p className="text-emerald-400">Campaign launched ✓</p>
+              <p className="font-mono text-xs break-all">PoolId: {result.pid}</p>
+              <div className="flex gap-2">
+                <Link className="btn-primary" href={`/swap/${chainId}/${result.pid}`}>Trade →</Link>
+                <a className="btn-ghost" href={`${EXPLORER[chainId as SupportedChainId]}/tx/${result.hash}`} target="_blank" rel="noreferrer">View tx ↗</a>
+              </div>
+              <p className="text-xs text-neutral-500">Manage it on the Governance page (paste the PoolId above).</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-neutral-400">
+                Deploys the token (if new + ERC-20 pair), signs Permit2 (if pulling ERC-20s), then
+                <code className="mx-1 font-mono">simulate → launchCampaign</code>. Fresh token + native ETH needs no Permit2.
+              </p>
+              <button className="btn-primary" disabled={!supported || !!stage} onClick={() => run(form)}>
+                {stage ?? "Launch campaign"}
+              </button>
+              {error && <p className="text-xs text-red-400">{error}</p>}
+            </>
+          )}
         </div>
       )}
 
       <div className="flex justify-between">
-        <button className="btn-ghost" disabled={step === 0} onClick={() => setStep((s) => (s - 1) as StepIndex)}>
-          Back
-        </button>
-        <button className="btn-primary" disabled={step === 4} onClick={() => setStep((s) => (s + 1) as StepIndex)}>
-          Next
-        </button>
+        <button className="btn-ghost" disabled={step === 0} onClick={() => setStep((s) => (s - 1) as StepIndex)}>Back</button>
+        <button className="btn-primary" disabled={step === 4} onClick={() => setStep((s) => (s + 1) as StepIndex)}>Next</button>
       </div>
     </div>
   );
 }
 
-function HookPlan({ plan }: { plan: ReturnType<typeof hookPlan> }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="card">
-      <h4 className="mb-2 text-sm font-semibold">Hook plan — what runs on-chain</h4>
-      <div className="space-y-2">
-        {plan.map((f) => (
-          <HookExplainer key={f.key} feature={f.key} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PlaceholderStep({ title, note, feature }: { title: string; note: string; feature: "launch.bootstrap" }) {
-  return (
-    <div className="card space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{title}</h3>
-        <HookBadge feature={feature} />
-      </div>
-      <p className="text-sm text-neutral-400">{note}</p>
-      <p className="text-xs text-neutral-600">Scaffold placeholder — form fields wired in a later phase (DESIGN.md §9).</p>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-neutral-400">{label}</span>
+      <span className="font-mono text-neutral-200">{children}</span>
     </div>
   );
 }
