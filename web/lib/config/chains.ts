@@ -1,8 +1,8 @@
-import { mainnet, base, arbitrum, unichain } from "wagmi/chains";
+import { mainnet, base, arbitrum, unichain, unichainSepolia } from "wagmi/chains";
 import { http, fallback, type Transport } from "viem";
 
 /** Chains the launch stack is deployed on (must match HookDeployLib.canonical). */
-export const SUPPORTED_CHAINS = [mainnet, base, arbitrum, unichain] as const;
+export const SUPPORTED_CHAINS = [mainnet, base, arbitrum, unichain, unichainSepolia] as const;
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
 export const SUPPORTED_CHAIN_IDS = SUPPORTED_CHAINS.map((c) => c.id) as SupportedChainId[];
@@ -13,6 +13,7 @@ const PUBLIC_FALLBACK_RPC: Record<SupportedChainId, string> = {
   [base.id]: "https://mainnet.base.org",
   [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
   [unichain.id]: "https://mainnet.unichain.org",
+  [unichainSepolia.id]: "https://sepolia.unichain.org",
 };
 
 const ENV_RPC: Record<SupportedChainId, string | undefined> = {
@@ -20,13 +21,22 @@ const ENV_RPC: Record<SupportedChainId, string | undefined> = {
   [base.id]: process.env.NEXT_PUBLIC_RPC_URL_8453,
   [arbitrum.id]: process.env.NEXT_PUBLIC_RPC_URL_42161,
   [unichain.id]: process.env.NEXT_PUBLIC_RPC_URL_130,
+  [unichainSepolia.id]: process.env.NEXT_PUBLIC_RPC_URL_1301,
 };
 
-/** Build a resilient transport per chain: primary (env) first, then a public fallback. */
+/**
+ * Server-side RPC proxy (`/app/api/rpc`) used as the PRIMARY transport for chains whose paid key
+ * should stay off the client — set the matching server-only `RPC_URL_<id>` to enable it. The proxy
+ * returns 501 when unconfigured, so viem's `fallback` simply moves on to env/public URLs.
+ */
+const PROXY_RPC: Partial<Record<SupportedChainId, string>> = {
+  [unichainSepolia.id]: "/api/rpc?chainId=1301",
+};
+
+/** Build a resilient transport per chain: proxy → env primary → public fallback. */
 export const transports: Record<SupportedChainId, Transport> = Object.fromEntries(
   SUPPORTED_CHAINS.map((c) => {
-    const primary = ENV_RPC[c.id];
-    const urls = [primary, PUBLIC_FALLBACK_RPC[c.id]].filter(Boolean) as string[];
+    const urls = [PROXY_RPC[c.id], ENV_RPC[c.id], PUBLIC_FALLBACK_RPC[c.id]].filter(Boolean) as string[];
     return [c.id, fallback(urls.map((u) => http(u, { retryCount: 2, timeout: 10_000 })))];
   })
 ) as Record<SupportedChainId, Transport>;
@@ -40,4 +50,5 @@ export const EXPLORER: Record<SupportedChainId, string> = {
   [base.id]: "https://basescan.org",
   [arbitrum.id]: "https://arbiscan.io",
   [unichain.id]: "https://uniscan.xyz",
+  [unichainSepolia.id]: "https://sepolia.uniscan.xyz",
 };

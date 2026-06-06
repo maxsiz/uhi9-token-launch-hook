@@ -18,9 +18,10 @@ const CHAINS: { id: number; key: string }[] = [
   { id: 8453, key: "base" },
   { id: 42161, key: "arbitrum" },
   { id: 130, key: "unichain" },
+  { id: 1301, key: "unichainSepolia" },
 ];
 
-const WANT = ["TokenLaunchHook", "CampaignWrapper", "TokenFactory"] as const;
+const WANT = ["TokenLaunchHook", "CampaignWrapper", "TokenFactory", "CampaignLens"] as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
 
 function readBroadcast(chainId: number): Record<string, string> {
@@ -28,6 +29,9 @@ function readBroadcast(chainId: number): Record<string, string> {
   const found: Record<string, string> = {};
   if (!existsSync(file)) return found;
   const json = JSON.parse(readFileSync(file, "utf8"));
+  // Only treat an artifact as a real deployment if it actually mined (has receipts). A 0-receipt
+  // run-latest.json is a simulation/dry-run and its addresses are not live — keep the chain at ZERO.
+  if (!Array.isArray(json.receipts) || json.receipts.length === 0) return found;
   for (const tx of json.transactions ?? []) {
     if (tx.contractName && WANT.includes(tx.contractName) && tx.contractAddress) {
       found[tx.contractName] = tx.contractAddress;
@@ -41,20 +45,22 @@ const rows = CHAINS.map(({ id, key }) => {
   const hook = a.TokenLaunchHook ?? ZERO;
   const wrapper = a.CampaignWrapper ?? ZERO;
   const factory = a.TokenFactory ?? ZERO;
+  const lens = a.CampaignLens ?? ZERO;
   const status = wrapper === ZERO ? "  (not deployed)" : "";
   console.log(`chain ${id} (${key}): wrapper=${wrapper}${status}`);
-  return `  [${key}.id]: { hook: "${hook}", wrapper: "${wrapper}", factory: "${factory}" },`;
+  return `  [${key}.id]: { hook: "${hook}", wrapper: "${wrapper}", factory: "${factory}", lens: "${lens}" },`;
 }).join("\n");
 
 const content = `// GENERATED FILE — do not hand-edit. Source: broadcast/DeployStack.s.sol/{chainId}/run-latest.json
 import type { Address } from "viem";
-import { mainnet, base, arbitrum, unichain } from "wagmi/chains";
+import { mainnet, base, arbitrum, unichain, unichainSepolia } from "wagmi/chains";
 import type { SupportedChainId } from "./chains";
 
 export interface StackAddresses {
   hook: Address;
   wrapper: Address;
   factory: Address;
+  lens: Address;
 }
 
 const ZERO = "${ZERO}" as const;

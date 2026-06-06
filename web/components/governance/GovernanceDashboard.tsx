@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useChainId } from "wagmi";
 import type { Hex } from "viem";
 import { CONTRACTS, isDeployed } from "@/lib/config/contracts.generated";
 import { isSupportedChain } from "@/lib/config/chains";
 import { HookActivityPanel } from "@/components/hook/HookActivityPanel";
 import { HookExplainer } from "@/components/hook/HookExplainer";
+import { CampaignSummary } from "@/components/governance/CampaignSummary";
 
 export function GovernanceDashboard() {
   const chainId = useChainId();
@@ -38,9 +40,15 @@ export function GovernanceDashboard() {
         </p>
       </div>
 
-      {valid && hook && (
+      {valid && hook && isSupportedChain(chainId) && (
         <div className="grid gap-4 md:grid-cols-2">
-          <HookActivityPanel hook={hook} pid={pid as Hex} />
+          <div className="space-y-4">
+            <CampaignSummary chainId={chainId} pid={pid as Hex} />
+            <HookActivityPanel hook={hook} pid={pid as Hex} />
+            <Link href={`/swap/${chainId}/${pid}`} className="btn inline-block">
+              Trade this pool →
+            </Link>
+          </div>
           <div className="space-y-3">
             <h3 className="text-sm font-semibold">Governance actions</h3>
             <p className="text-xs text-neutral-500">
