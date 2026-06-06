@@ -91,6 +91,18 @@ library HookDeployLib {
         }
         return (address(0), address(0));
     }
+
+    /// @notice Block-explorer base URL (no trailing slash) for a chain id; "" if unknown.
+    /// @dev Append `"/address/<addr>"` for a contract link. Mirrors the chains in `canonical()`.
+    function explorerBaseUrl(uint256 chainId) internal pure returns (string memory) {
+        if (chainId == 1) return "https://etherscan.io"; // Ethereum mainnet
+        if (chainId == 8453) return "https://basescan.org"; // Base
+        if (chainId == 42161) return "https://arbiscan.io"; // Arbitrum One
+        if (chainId == 130) return "https://uniscan.xyz"; // Unichain
+        if (chainId == 1301) return "https://sepolia.uniscan.xyz"; // Unichain Sepolia
+        if (chainId == 11155111) return "https://sepolia.etherscan.io"; // Sepolia
+        return "";
+    }
 }
 
 /// @title MineSalt

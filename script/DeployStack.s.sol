@@ -51,14 +51,27 @@ contract DeployStack is Script {
             "DeployStack: hook flag bits invalid"
         );
 
+        string memory explorer = HookDeployLib.explorerBaseUrl(block.chainid);
+
         console2.log("chainId        ", block.chainid);
         console2.log("PoolManager    ", poolManager);
         console2.log("PositionManager", positionManager);
         console2.log("Permit2        ", permit2);
-        console2.log("TokenLaunchHook", address(hook));
-        console2.log("CampaignWrapper", address(wrapper));
-        console2.log("CampaignLens   ", address(lens));
-        console2.log("TokenFactory   ", address(factory));
-        console2.log("StandardToken  ", factory.TOKEN_IMPLEMENTATION());
+
+        // Deployed artifacts as block-explorer links (falls back to the raw address on unknown chains).
+        _logArtifact("TokenLaunchHook", address(hook), explorer);
+        _logArtifact("CampaignWrapper", address(wrapper), explorer);
+        _logArtifact("CampaignLens   ", address(lens), explorer);
+        _logArtifact("TokenFactory   ", address(factory), explorer);
+        _logArtifact("StandardToken  ", factory.TOKEN_IMPLEMENTATION(), explorer);
+    }
+
+    /// @dev Log `label` with a block-explorer link to `addr`, or the raw address if `explorer` is "".
+    function _logArtifact(string memory label, address addr, string memory explorer) private pure {
+        if (bytes(explorer).length == 0) {
+            console2.log(label, addr);
+        } else {
+            console2.log(string.concat(label, " ", explorer, "/address/", vm.toString(addr)));
+        }
     }
 }
