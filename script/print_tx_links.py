@@ -53,13 +53,28 @@ def main() -> int:
 
     data = json.loads(artifact.read_text())
     txs = data.get("transactions", [])
+    receipts = data.get("receipts", [])
 
-    # Map each lifecycle step to the first matching transaction's hash.
+    # IMPORTANT: do NOT use transactions[].hash — forge writes it scrambled (assigned in mined-nonce
+    # order, not call order), so it does not match transactions[].function. The reliable mapping is
+    # transactions[i].function (decoded from that call's data) paired with receipts[i].transactionHash,
+    # which forge writes index-aligned with the transactions array.
+    if len(receipts) != len(txs):
+        print(
+            f"Warning: {len(txs)} transactions vs {len(receipts)} receipts — index alignment may be off.",
+            file=sys.stderr,
+        )
+
+    def hash_for(prefix: str):
+        for i, t in enumerate(txs):
+            if (t.get("function") or "").startswith(prefix) and i < len(receipts):
+                return receipts[i].get("transactionHash")
+        return None
+
     print(f"Explorer: {explorer}  (chainId {chain_id})\n")
     missing = False
     for label, prefix in STEPS:
-        tx = next((t for t in txs if (t.get("function") or "").startswith(prefix)), None)
-        tx_hash = tx.get("hash") if tx else None
+        tx_hash = hash_for(prefix)
         if tx_hash:
             print(f"{label}:\n  {explorer}/tx/{tx_hash}\n")
         else:
