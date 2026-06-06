@@ -85,6 +85,10 @@ library HookDeployLib {
             // Unichain
             return (0x1F98400000000000000000000000000000000004, 0x4529A01c7A0410167c5740C487A8DE60232617bf);
         }
+        if (chainId == 1301) {
+            // Unichain Sepolia (testnet) — verified on-chain via POSM.poolManager() (2026-06-06)
+            return (0x00B036B58a818B1BC34d502D3fE730Db729e62AC, 0xf969Aee60879C54bAAed9F3eD26147Db216Fd664);
+        }
         return (address(0), address(0));
     }
 }
