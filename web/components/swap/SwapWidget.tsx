@@ -284,10 +284,10 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       </div>
 
       <div className="flex gap-2">
-        <button className={isBuy ? "btn" : "btn-ghost"} onClick={() => setIsBuy(true)}>
+        <button className={isBuy ? "btn-primary" : "btn-ghost"} onClick={() => setIsBuy(true)}>
           Buy {derived.tokenMetaInfo.symbol}
         </button>
-        <button className={!isBuy ? "btn" : "btn-ghost"} onClick={() => setIsBuy(false)}>
+        <button className={!isBuy ? "btn-primary" : "btn-ghost"} onClick={() => setIsBuy(false)}>
           Sell {derived.tokenMetaInfo.symbol}
         </button>
       </div>
@@ -311,7 +311,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
         <p className="text-[11px] text-neutral-500">Slippage {slippageBps / 100}% · quote via V4Quoter</p>
       </div>
 
-      <button className="btn w-full disabled:opacity-50" disabled={primary.disabled} onClick={primary.onClick}>
+      <button className="btn-primary w-full" disabled={primary.disabled} onClick={primary.onClick}>
         {primary.label}
       </button>
 

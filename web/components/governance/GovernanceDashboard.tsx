@@ -7,8 +7,8 @@ import type { Hex } from "viem";
 import { CONTRACTS, isDeployed } from "@/lib/config/contracts.generated";
 import { isSupportedChain } from "@/lib/config/chains";
 import { HookActivityPanel } from "@/components/hook/HookActivityPanel";
-import { HookExplainer } from "@/components/hook/HookExplainer";
 import { CampaignSummary } from "@/components/governance/CampaignSummary";
+import { GovernanceActions } from "@/components/governance/GovernanceActions";
 
 export function GovernanceDashboard() {
   const chainId = useChainId();
@@ -45,7 +45,7 @@ export function GovernanceDashboard() {
           <div className="space-y-4">
             <CampaignSummary chainId={chainId} pid={pid as Hex} />
             <HookActivityPanel hook={hook} pid={pid as Hex} />
-            <Link href={`/swap/${chainId}/${pid}`} className="btn inline-block">
+            <Link href={`/swap/${chainId}/${pid}`} className="btn-primary inline-block">
               Trade this pool →
             </Link>
           </div>
@@ -55,13 +55,7 @@ export function GovernanceDashboard() {
               Available to the governance-NFT owner during the Active phase. Each action is badged with the hook
               callback it influences.
             </p>
-            <HookExplainer feature="gov.taxOverride" />
-            <HookExplainer feature="gov.relaxLock" />
-            <HookExplainer feature="gov.whitelist" />
-            <p className="text-xs text-neutral-600">
-              Scaffold: wire <code className="font-mono">setBuyTaxOverride</code> / <code className="font-mono">relax*</code> /
-              whitelist setters behind <code className="font-mono">OwnerGuard</code> (DESIGN.md §4.6).
-            </p>
+            <GovernanceActions chainId={chainId} pid={pid as Hex} hook={hook} />
           </div>
         </div>
       )}
