@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ConnectButton } from "@/components/ui/ConnectButton";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/governance" className="text-neutral-300 hover:text-white">
                   Governance
                 </Link>
+                <ConnectButton />
               </nav>
             </div>
           </header>
