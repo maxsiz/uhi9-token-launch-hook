@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ui/ConnectButton";
 import { NetworkSelector } from "@/components/ui/NetworkSelector";
+import { Logo } from "@/components/ui/Logo";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -25,8 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <header className="border-b border-neutral-800">
             <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-              <Link href="/" className="font-semibold">
-                🪝 TokenLaunchHook <span className="text-neutral-500">Studio</span>
+              <Link href="/" className="flex items-center gap-2 font-semibold">
+                <Logo className="h-7 w-7" />
+                <span>
+                  TokenLaunchHook <span className="text-neutral-500">Studio</span>
+                </span>
+                <span className="text-xs font-normal text-neutral-600">v{process.env.NEXT_PUBLIC_APP_VERSION ?? "0.1.0"}</span>
               </Link>
               <nav className="flex items-center gap-4 text-sm">
                 <Link href="/launch" className="text-neutral-300 hover:text-white">

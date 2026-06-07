@@ -34,7 +34,7 @@ function TokenCell({ chainId, address }: { chainId: SupportedChainId; address: A
   const native = address.toLowerCase() === ZERO;
   const meta = useErc20Meta(chainId, native ? undefined : address);
   if (native) return <span>ETH <span className="text-neutral-500">native</span></span>;
-  const label = meta.symbol ? `${meta.symbol}${meta.name ? ` · ${meta.name}` : ""}` : meta.isLoading ? "…" : "token";
+  const label = meta.symbol ? `${meta.name ? meta.name + " " : ""}(${meta.symbol})` : meta.isLoading ? "…" : "token";
   return (
     <span>
       {label} <AddrLink chainId={chainId} address={address} />
