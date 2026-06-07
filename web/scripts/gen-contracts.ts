@@ -43,6 +43,15 @@ function readBroadcast(chainId: number): { found: Record<string, string>; deploy
   return { found, deployBlock };
 }
 
+// Safety net for foreign build hosts (e.g. Vercel): if the broadcast tree is entirely absent, do NOT
+// regenerate — that would overwrite the committed contracts.generated.ts with all-zero addresses and
+// ship a site with no contracts. Keep the checked-in file as-is.
+const BROADCAST_DIR = join(REPO_ROOT, "broadcast", "DeployStack.s.sol");
+if (!existsSync(BROADCAST_DIR)) {
+  console.warn(`broadcast tree missing (${BROADCAST_DIR}) — keeping committed ${OUT} unchanged.`);
+  process.exit(0);
+}
+
 const parsed = CHAINS.map(({ id, key }) => ({ id, key, ...readBroadcast(id) }));
 
 const rows = parsed
