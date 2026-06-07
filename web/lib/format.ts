@@ -15,6 +15,15 @@ export function toWei(human: string, decimals = 18): bigint {
   return parseUnits(human || "0", decimals);
 }
 
+/**
+ * Human-readable price/number without scientific notation (e.g. 0.0000005 instead of 5e-7).
+ * Returns "—" for non-finite or non-positive inputs. Caps at 6 significant digits.
+ */
+export function formatPriceHuman(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return n.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+}
+
 /** V4 fee units → percent. 100000 units == 10%. */
 export function taxUnitsToPercent(units: number): number {
   return units / 10_000;

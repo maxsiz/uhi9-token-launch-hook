@@ -55,6 +55,9 @@ export interface PreparedLaunch {
   value: bigint; // msg.value when the pair is native ETH
   /** ERC-20 sides the wrapper must pull via Permit2 (empty for fresh-token + native-ETH). */
   permitTokens: { token: Address; amount: bigint }[];
+  /** Decimals of currency0 / currency1 (orientation-resolved) — for formatting the mint amount caps. */
+  decimals0: number;
+  decimals1: number;
 }
 
 export function prepareLaunch(input: LaunchFormInput, nowSec: number): PreparedLaunch {
@@ -148,5 +151,5 @@ export function prepareLaunch(input: LaunchFormInput, nowSec: number): PreparedL
   if (existingToken !== ZERO) permitTokens.push({ token: existingToken, amount: tokenRaw });
   if (!pairIsNative) permitTokens.push({ token: pairToken, amount: pairRaw });
 
-  return { params, value, permitTokens };
+  return { params, value, permitTokens, decimals0, decimals1 };
 }

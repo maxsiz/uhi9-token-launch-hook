@@ -14,7 +14,7 @@ import { isSupportedChain, EXPLORER, type SupportedChainId } from "@/lib/config/
 import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "@/lib/campaign/launch";
 import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
 import { useErc20Meta, type Erc20Meta } from "@/lib/useErc20Meta";
-import { formatAmount, truncateAddress } from "@/lib/format";
+import { formatAmount, formatPriceHuman, truncateAddress } from "@/lib/format";
 
 const num = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9]/g, "");
 const dec = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9.]/g, "");
@@ -60,7 +60,6 @@ export function LaunchWizard() {
   const [lockVolThreshold, setLockVolThreshold] = useState("0");
   const [wlWindow, setWlWindow] = useState("30"); // minutes
 
-  const pairSym = pairMode === "native" ? "ETH" : "pair";
   const modules: ModuleConfigInput = useMemo(
     () => ({
       antiSnipe: { durationMinutes: Number(asDuration) || 0, maxBuyHuman: asMaxBuy },
@@ -82,6 +81,12 @@ export function LaunchWizard() {
   const pairMeta = useErc20Meta(chainId, pairMode === "erc20" && isAddr(pairAddress) ? (pairAddress as Address) : undefined);
   const existingDecimals = existingMeta.decimals ?? 18;
   const pairDecimals = pairMeta.decimals ?? 18;
+
+  const pairSym = pairMode === "native" ? "ETH" : pairMeta.symbol ?? "pair";
+  const tokenSym = tokenMode === "new" ? symbol || "token" : existingMeta.symbol ?? "token";
+  // Initial price from the seed ratio (pair currency per 1 token), and its reverse.
+  const pairPerToken = Number(seedPair) / Number(seedToken);
+  const tokenPerPair = Number(seedToken) / Number(seedPair);
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
   const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
@@ -209,7 +214,7 @@ export function LaunchWizard() {
           <Field label="Launch duration (days, ≥ 1)" hint="How long fair-launch rules stay enforceable (1–365 d). Governance can only relax params during this Active window; after it everything freezes.">
             <input className="input" value={durationDays} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} />
           </Field>
-          <p className="text-xs text-neutral-500">Initial price ≈ {Number(seedPair) / Math.max(Number(seedToken), 1e-9)} pair per token (set by the seed ratio).</p>
+          <p className="text-xs text-neutral-500">Initial price ≈ {formatPriceHuman(pairPerToken)} {pairSym} per {tokenSym} (set by the seed ratio).</p>
         </div>
       )}
 
@@ -322,9 +327,12 @@ export function LaunchWizard() {
               <Row label="Token">{tokenMode === "new" ? `${name} (${symbol}), new` : `${existingMeta.symbol ? existingMeta.symbol + " " : ""}${truncateAddress(existingToken)}`}</Row>
               <Row label="Pair">{pairMode === "native" ? "native ETH" : `${pairMeta.symbol ? pairMeta.symbol + " " : ""}${truncateAddress(pairAddress)}`}</Row>
               <Row label="Fee">{preview.params.fee === 0x800000 ? "dynamic (tax)" : `${preview.params.fee / 10000}%`}</Row>
+              <Row label="Initial price">
+                {formatPriceHuman(pairPerToken)} {pairSym}/{tokenSym} · {formatPriceHuman(tokenPerPair)} {tokenSym}/{pairSym}
+              </Row>
               <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
               <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
-              <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, 18, 4)} / {formatAmount(preview.params.amount1Max, 18, 4)}</Row>
+              <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, preview.decimals0, 4)} / {formatAmount(preview.params.amount1Max, preview.decimals1, 4)}</Row>
               {preview.value > 0n && <Row label="ETH value">{formatAmount(preview.value, 18, 6)}</Row>}
             </div>
           ) : (
