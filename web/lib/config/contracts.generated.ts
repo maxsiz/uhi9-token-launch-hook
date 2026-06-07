@@ -13,7 +13,7 @@ export interface StackAddresses {
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 export const CONTRACTS: Record<SupportedChainId, StackAddresses> = {
-  [mainnet.id]: { hook: "0x0000000000000000000000000000000000000000", wrapper: "0x0000000000000000000000000000000000000000", factory: "0x0000000000000000000000000000000000000000", lens: "0x0000000000000000000000000000000000000000" },
+  [mainnet.id]: { hook: "0x0b93309f6b6e404769de885dac66cb357ad30ac0", wrapper: "0x8a56c6be755ac385395e96234b553db1b9b06bea", factory: "0xa373fbacd0964fcb7bc01cb447a2f25f11e8995b", lens: "0xf8da8dc6d8cdcadcc96b51d5fc0cb59ef3672005" },
   [base.id]: { hook: "0x0000000000000000000000000000000000000000", wrapper: "0x0000000000000000000000000000000000000000", factory: "0x0000000000000000000000000000000000000000", lens: "0x0000000000000000000000000000000000000000" },
   [arbitrum.id]: { hook: "0x0000000000000000000000000000000000000000", wrapper: "0x0000000000000000000000000000000000000000", factory: "0x0000000000000000000000000000000000000000", lens: "0x0000000000000000000000000000000000000000" },
   [unichain.id]: { hook: "0xd5ca99907f2db792dcd4865e7d12df5f71874ac0", wrapper: "0x4f85ffb544c0de49a231408157c5b8dab4a55a1c", factory: "0x653bce4d7a6cf5c4fdbbd5fc6b2bb41c8eafc56a", lens: "0x22bbbe241464ab67c9b4f0881fa45f7f2d26870f" },
@@ -26,7 +26,7 @@ export function isDeployed(chainId: SupportedChainId): boolean {
 
 /** Stack deploy block per chain — lower bound for log-based position discovery (0 if not deployed). */
 export const DEPLOY_BLOCK: Record<SupportedChainId, bigint> = {
-  [mainnet.id]: 0n,
+  [mainnet.id]: 25265847n,
   [base.id]: 0n,
   [arbitrum.id]: 0n,
   [unichain.id]: 50089742n,
