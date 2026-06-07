@@ -5,7 +5,7 @@ import type { Hex } from "viem";
 
 import { useCampaign } from "@/lib/campaign/useCampaign";
 import { type SupportedChainId } from "@/lib/config/chains";
-import { formatAmount, taxUnitsToPercent, truncateAddress } from "@/lib/format";
+import { formatAmount, formatUtc, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 
 const PHASES = ["Pre-launch", "Active", "Frozen"];
 
@@ -33,7 +33,6 @@ export function CampaignSummary({ chainId, pid }: { chainId: SupportedChainId; p
     [en.antiSnipe && "anti-snipe", en.tax && "tax", en.lock && "lock", en.whitelist && "whitelist"]
       .filter(Boolean)
       .join(", ") || "none";
-  const endDate = new Date(Number(campaign.launchEndTime) * 1000);
 
   return (
     <div className="card space-y-2">
@@ -55,13 +54,13 @@ export function CampaignSummary({ chainId, pid }: { chainId: SupportedChainId; p
           {taxUnitsToPercent(campaign.effectiveBuyTax).toFixed(2)}% / {taxUnitsToPercent(campaign.effectiveSellTax).toFixed(2)}%
         </Row>
       )}
-      {en.whitelist && <Row label="Whitelist until">{new Date(Number(campaign.whitelist.whitelistEndTime) * 1000).toLocaleString()}</Row>}
+      {en.whitelist && <Row label="Whitelist until">{formatUtc(campaign.whitelist.whitelistEndTime)}</Row>}
       {en.lock && (
         <Row label="Lock">
           {campaign.lockUnlocked ? "unlocked" : "locked"} · vol {formatAmount(campaign.cumulativeVolume, 18, 2)}
         </Row>
       )}
-      <Row label="Governance ends">{endDate.toLocaleString()}</Row>
+      <Row label="Governance ends">{formatUtc(campaign.launchEndTime)}</Row>
     </div>
   );
 }

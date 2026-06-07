@@ -30,3 +30,13 @@ export const MAX_TAX_UNITS = 100_000; // 10%
 export function isZeroAddress(addr?: Address): boolean {
   return !addr || addr === "0x0000000000000000000000000000000000000000";
 }
+
+/**
+ * Format a unix timestamp (seconds) as an unambiguous UTC string `YYYY-MM-DD HH:MM UTC`.
+ * Locale-independent — avoids the browser's mm/dd/yyyy default. Accepts bigint or number.
+ */
+export function formatUtc(unixSeconds: bigint | number): string {
+  const ms = Number(unixSeconds) * 1000;
+  if (!Number.isFinite(ms)) return "—";
+  return `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}

@@ -7,7 +7,7 @@ import type { Address, Hex } from "viem";
 import { useCampaign } from "@/lib/campaign/useCampaign";
 import { TokenLaunchHookAbi } from "@/lib/config/abi";
 import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
-import { percentToTaxUnits, taxUnitsToPercent, truncateAddress } from "@/lib/format";
+import { formatUtc, percentToTaxUnits, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 
 function toUnix(local: string): bigint {
   return BigInt(Math.floor(new Date(local).getTime() / 1000));
@@ -105,7 +105,7 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
         <div className="card space-y-2">
           <h4 className="text-sm font-semibold">Whitelist</h4>
           <p className="text-xs text-neutral-500">
-            Window until {new Date(Number(campaign.whitelist.whitelistEndTime) * 1000).toLocaleString()}.
+            Window until {formatUtc(campaign.whitelist.whitelistEndTime)}.
           </p>
           <div className="flex gap-2">
             <input value={wlAddr} onChange={(e) => setWlAddr(e.target.value)} placeholder="0x address" className="input flex-1 font-mono" />
