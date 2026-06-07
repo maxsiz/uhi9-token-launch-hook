@@ -13,10 +13,12 @@ import { HookBadge } from "@/components/hook/HookBadge";
 import { isSupportedChain, EXPLORER, type SupportedChainId } from "@/lib/config/chains";
 import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "@/lib/campaign/launch";
 import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
+import { useErc20Meta, type Erc20Meta } from "@/lib/useErc20Meta";
 import { formatAmount, truncateAddress } from "@/lib/format";
 
 const num = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9]/g, "");
 const dec = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9.]/g, "");
+const isAddr = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
 
 const STEPS = ["Token", "Pool & price", "Mechanisms", "Review", "Sign"] as const;
 type StepIndex = 0 | 1 | 2 | 3 | 4;
@@ -38,10 +40,8 @@ export function LaunchWizard() {
   const [symbol, setSymbol] = useState("DEMO");
   const [supplyStr, setSupplyStr] = useState("1000000");
   const [existingToken, setExistingToken] = useState("");
-  const [existingDecimals, setExistingDecimals] = useState("18");
   const [pairMode, setPairMode] = useState<"native" | "erc20">("native");
   const [pairAddress, setPairAddress] = useState("");
-  const [pairDecimals, setPairDecimals] = useState("6");
   const [seedToken, setSeedToken] = useState("100000");
   const [seedPair, setSeedPair] = useState("0.05");
   const [durationDays, setDurationDays] = useState("1");
@@ -77,6 +77,12 @@ export function LaunchWizard() {
   );
   const whitelistWindowMinutes = Number(wlWindow) || 30;
 
+  // Auto-resolve ERC-20 metadata (decimals/name/symbol) + balance for pasted addresses.
+  const existingMeta = useErc20Meta(chainId, isAddr(existingToken) ? (existingToken as Address) : undefined);
+  const pairMeta = useErc20Meta(chainId, pairMode === "erc20" && isAddr(pairAddress) ? (pairAddress as Address) : undefined);
+  const existingDecimals = existingMeta.decimals ?? 18;
+  const pairDecimals = pairMeta.decimals ?? 18;
+
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
   const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
 
@@ -101,10 +107,10 @@ export function LaunchWizard() {
       }
     })(),
     existingToken: (existingToken || ZERO) as Address,
-    existingTokenDecimals: Number(existingDecimals) || 18,
+    existingTokenDecimals: existingDecimals,
     pairMode,
     pairAddress: (pairAddress || ZERO) as Address,
-    pairDecimals: Number(pairDecimals) || 18,
+    pairDecimals,
     seedToken,
     seedPair,
     durationDays: Number(durationDays) || 1,
@@ -120,8 +126,8 @@ export function LaunchWizard() {
         newToken: tokenMode === "new" ? { name, symbol, totalSupply: form.totalSupply } : undefined,
         existingToken: tokenMode === "existing" ? (existingToken as Address) : undefined,
         tokenAddress: tokenMode === "existing" ? (existingToken as Address) : undefined,
-        tokenDecimals: tokenMode === "existing" ? Number(existingDecimals) || 18 : 18,
-        pair: pairMode === "native" ? { native: true } : { address: pairAddress as Address, decimals: Number(pairDecimals) || 18 },
+        tokenDecimals: tokenMode === "existing" ? existingDecimals : 18,
+        pair: pairMode === "native" ? { native: true } : { address: pairAddress as Address, decimals: pairDecimals },
         seedTokenHuman: seedToken,
         seedPairHuman: seedPair,
         launchDurationDays: Number(durationDays) || 1,
@@ -139,7 +145,7 @@ export function LaunchWizard() {
       return undefined;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingDecimals, pairMode, pairAddress, pairDecimals, seedToken, seedPair, durationDays, address, enabled, modules, whitelistWindowMinutes]);
+  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingMeta.decimals, pairMode, pairAddress, pairMeta.decimals, seedToken, seedPair, durationDays, address, enabled, modules, whitelistWindowMinutes]);
 
   return (
     <div className="space-y-6">
@@ -168,9 +174,9 @@ export function LaunchWizard() {
               <input className="input" value={supplyStr} onChange={(e) => setSupplyStr(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Total supply" />
             </div>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
               <input className="input font-mono" value={existingToken} onChange={(e) => setExistingToken(e.target.value.trim())} placeholder="0x token address" />
-              <input className="input" value={existingDecimals} onChange={(e) => setExistingDecimals(e.target.value)} placeholder="decimals" />
+              <MetaHint addr={existingToken} meta={existingMeta} />
             </div>
           )}
         </div>
@@ -187,9 +193,9 @@ export function LaunchWizard() {
             <button className={pairMode === "erc20" ? "btn-primary" : "btn-ghost"} onClick={() => setPairMode("erc20")}>ERC-20</button>
           </div>
           {pairMode === "erc20" && (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="space-y-1">
               <input className="input font-mono" value={pairAddress} onChange={(e) => setPairAddress(e.target.value.trim())} placeholder="0x pair token (e.g. USDC)" />
-              <input className="input" value={pairDecimals} onChange={(e) => setPairDecimals(e.target.value)} placeholder="pair decimals" />
+              <MetaHint addr={pairAddress} meta={pairMeta} />
             </div>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
@@ -283,8 +289,8 @@ export function LaunchWizard() {
           <h3 className="font-semibold">Review</h3>
           {preview ? (
             <div className="card space-y-1 text-sm">
-              <Row label="Token">{tokenMode === "new" ? `${name} (${symbol}), new` : truncateAddress(existingToken)}</Row>
-              <Row label="Pair">{pairMode === "native" ? "native ETH" : truncateAddress(pairAddress)}</Row>
+              <Row label="Token">{tokenMode === "new" ? `${name} (${symbol}), new` : `${existingMeta.symbol ? existingMeta.symbol + " " : ""}${truncateAddress(existingToken)}`}</Row>
+              <Row label="Pair">{pairMode === "native" ? "native ETH" : `${pairMeta.symbol ? pairMeta.symbol + " " : ""}${truncateAddress(pairAddress)}`}</Row>
               <Row label="Fee">{preview.params.fee === 0x800000 ? "dynamic (tax)" : `${preview.params.fee / 10000}%`}</Row>
               <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
               <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
@@ -350,5 +356,19 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-xs text-neutral-400">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** Small auto-resolved ERC-20 hint under an address input: symbol · decimals · balance. */
+function MetaHint({ addr, meta }: { addr: string; meta: Erc20Meta }) {
+  if (!isAddr(addr)) return null;
+  if (meta.isLoading) return <p className="text-xs text-neutral-500">resolving token…</p>;
+  if (!meta.isToken) return <p className="text-xs text-amber-400">Not a standard ERC-20 — decimals assumed 18.</p>;
+  const d = meta.decimals ?? 18;
+  return (
+    <p className="text-xs text-neutral-500">
+      {meta.symbol ?? "?"} {meta.name ? `(${meta.name}) ` : ""}· {d} dec
+      {meta.balance != null && ` · balance ${formatAmount(meta.balance, d, 4)}`}
+    </p>
   );
 }
