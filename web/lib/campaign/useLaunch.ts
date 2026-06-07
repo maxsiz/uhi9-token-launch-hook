@@ -98,6 +98,37 @@ export function useLaunch(chainId: SupportedChainId) {
 
     const prepared = prepareLaunch(input, Math.floor(Date.now() / 1000));
 
+    // DEBUG: log the tx cost plan (value + L2 gas) vs balance — reveals "insufficient funds".
+    try {
+      const [gas, gasPrice, bal] = await Promise.all([
+        client.estimateContractGas({ account: address, address: wrapper, abi: CampaignWrapperAbi, functionName: "launchCampaign", args: [prepared.params, "0x"], value: prepared.value }),
+        client.getGasPrice(),
+        client.getBalance({ address }),
+      ]);
+      const l2Fee = gas * gasPrice;
+      console.log(
+        "[Launch] cost plan\n" +
+          JSON.stringify(
+            {
+              pair: form.pairMode,
+              valueWei: prepared.value.toString(),
+              amount0Max: prepared.params.amount0Max.toString(),
+              amount1Max: prepared.params.amount1Max.toString(),
+              gas: gas.toString(),
+              gasPrice: gasPrice.toString(),
+              l2FeeWei: l2Fee.toString(),
+              valuePlusL2FeeWei: (prepared.value + l2Fee).toString(),
+              balanceWei: bal.toString(),
+              enoughForValuePlusL2: bal >= prepared.value + l2Fee,
+            },
+            null,
+            2
+          )
+      );
+    } catch (e) {
+      console.warn("[Launch] estimateContractGas threw (the tx would revert / insufficient funds):", (e as Error)?.message);
+    }
+
     // 2) Permit2 allowance for each ERC-20 side: token → Permit2, then Permit2 → wrapper (direct, no
     //    signature). The wrapper pulls via Permit2.transferFrom, so permitData stays "0x".
     const expiration = Math.floor(Date.now() / 1000) + PERMIT2_EXPIRATION_SECS;
@@ -136,6 +167,7 @@ export function useLaunch(chainId: SupportedChainId) {
     try {
       return await launch(form);
     } catch (e: unknown) {
+      console.error("[Launch] full error", e); // DEBUG: see the complete cause/metaMessages
       const msg = e instanceof Error ? (e as { shortMessage?: string }).shortMessage ?? e.message.split("\n")[0] : "Launch failed";
       setError(msg);
       setStage(undefined);
