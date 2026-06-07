@@ -17,9 +17,13 @@ export interface UniswapAddresses {
  * StateView) is filled where the swap UI runs.
  */
 export const UNISWAP: Record<SupportedChainId, UniswapAddresses> = {
+  // Ethereum mainnet — periphery verified on-chain (codesize > 0, poolManager() matches) 2026-06-07.
   [mainnet.id]: {
     poolManager: "0x000000000004444c5dc75cB358380D2e3dE08A90",
     positionManager: "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e",
+    universalRouter: "0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af",
+    quoter: "0x52F0E24D1c21C8A0cB1e5a5dD6198556BD9E1203",
+    stateView: "0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227",
   },
   [base.id]: {
     poolManager: "0x498581fF718922c3f8e6A244956aF099B2652b2b",
