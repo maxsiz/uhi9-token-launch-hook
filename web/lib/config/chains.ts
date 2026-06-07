@@ -11,9 +11,13 @@ export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
 export const SUPPORTED_CHAIN_IDS = SUPPORTED_CHAINS.map((c) => c.id) as SupportedChainId[];
 
-/** Public fallback RPCs — used after the env-configured primary in a viem `fallback` transport. */
+/**
+ * Public fallback RPCs — used after the env-configured primary in a viem `fallback` transport.
+ * Must be browser-CORS-friendly (send Access-Control-Allow-Origin). eth.llamarpc.com is behind a
+ * Cloudflare challenge that 403s the preflight, so mainnet uses PublicNode instead.
+ */
 const PUBLIC_FALLBACK_RPC: Record<SupportedChainId, string> = {
-  [mainnet.id]: "https://eth.llamarpc.com",
+  [mainnet.id]: "https://ethereum-rpc.publicnode.com",
   [base.id]: "https://mainnet.base.org",
   [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
   [unichain.id]: "https://mainnet.unichain.org",
