@@ -199,10 +199,16 @@ export function LaunchWizard() {
             </div>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="space-y-1"><span className="text-xs text-neutral-400">Seed token amount</span><input className="input" value={seedToken} onChange={(e) => setSeedToken(e.target.value.replace(/[^0-9.]/g, ""))} /></label>
-            <label className="space-y-1"><span className="text-xs text-neutral-400">Seed pair amount ({pairMode === "native" ? "ETH" : "pair"})</span><input className="input" value={seedPair} onChange={(e) => setSeedPair(e.target.value.replace(/[^0-9.]/g, ""))} /></label>
+            <Field label="Seed token amount" hint="How many of your tokens seed the pool. With the pair amount it sets the starting price.">
+              <input className="input" value={seedToken} onChange={(e) => setSeedToken(e.target.value.replace(/[^0-9.]/g, ""))} />
+            </Field>
+            <Field label={`Seed pair amount (${pairMode === "native" ? "ETH" : "pair"})`} hint={`${pairMode === "native" ? "ETH" : "Pair currency"} that seeds the pool. Starting price ≈ pair ÷ token.`}>
+              <input className="input" value={seedPair} onChange={(e) => setSeedPair(e.target.value.replace(/[^0-9.]/g, ""))} />
+            </Field>
           </div>
-          <label className="space-y-1 block"><span className="text-xs text-neutral-400">Launch duration (days, ≥ 1)</span><input className="input" value={durationDays} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} /></label>
+          <Field label="Launch duration (days, ≥ 1)" hint="How long fair-launch rules stay enforceable (1–365 d). Governance can only relax params during this Active window; after it everything freezes.">
+            <input className="input" value={durationDays} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} />
+          </Field>
           <p className="text-xs text-neutral-500">Initial price ≈ {Number(seedPair) / Math.max(Number(seedToken), 1e-9)} pair per token (set by the seed ratio).</p>
         </div>
       )}
@@ -232,18 +238,33 @@ export function LaunchWizard() {
 
                 {enabled.antiSnipe && k === "antiSnipe" && (
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <Field label="Window (min, ≤ 1440)"><input className="input" value={asDuration} onChange={(e) => setAsDuration(num(e))} /></Field>
-                    <Field label={`Max buy / tx (${pairSym})`}><input className="input" value={asMaxBuy} onChange={(e) => setAsMaxBuy(dec(e))} /></Field>
+                    <Field label="Window (min, ≤ 1440)" hint="Anti-snipe stays active this long after launch (max 24 h). After it expires, buy size is unrestricted.">
+                      <input className="input" value={asDuration} onChange={(e) => setAsDuration(num(e))} />
+                    </Field>
+                    <Field
+                      label={`Max buy / tx (${pairSym})`}
+                      hint={`Largest single buy, measured by ${pairSym} spent (exact-input). Larger buys revert; exact-output buys are blocked during the window. Sells are never limited. 0 = blocks all buys.`}
+                    >
+                      <input className="input" value={asMaxBuy} onChange={(e) => setAsMaxBuy(dec(e))} />
+                    </Field>
                   </div>
                 )}
 
                 {enabled.tax && k === "tax" && (
                   <>
                     <div className="grid gap-2 sm:grid-cols-4">
-                      <Field label="Buy %"><input className="input" value={taxBuy} onChange={(e) => setTaxBuy(dec(e))} /></Field>
-                      <Field label="Sell %"><input className="input" value={taxSell} onChange={(e) => setTaxSell(dec(e))} /></Field>
-                      <Field label="Base %"><input className="input" value={taxBase} onChange={(e) => setTaxBase(dec(e))} /></Field>
-                      <Field label="Decay (days)"><input className="input" value={taxDecay} onChange={(e) => setTaxDecay(dec(e))} /></Field>
+                      <Field label="Buy %" hint="Tax on buys at launch (max 10%), charged as the dynamic LP fee. Decays linearly to Base %.">
+                        <input className="input" value={taxBuy} onChange={(e) => setTaxBuy(dec(e))} />
+                      </Field>
+                      <Field label="Sell %" hint="Tax on sells at launch (max 10%); usually higher than buy. Decays to Base %.">
+                        <input className="input" value={taxSell} onChange={(e) => setTaxSell(dec(e))} />
+                      </Field>
+                      <Field label="Base %" hint="Floor tax after decay finishes — and the permanent fee if Decay = 0. Must be ≤ both buy and sell.">
+                        <input className="input" value={taxBase} onChange={(e) => setTaxBase(dec(e))} />
+                      </Field>
+                      <Field label="Decay (days)" hint="Time for the tax to fall linearly from initial to Base. 0 = no decay (always Base).">
+                        <input className="input" value={taxDecay} onChange={(e) => setTaxDecay(dec(e))} />
+                      </Field>
                     </div>
                     {(Number(taxBase) > Number(taxBuy) || Number(taxBase) > Number(taxSell)) && (
                       <p className="text-xs text-amber-400">Base % must be ≤ both initial taxes.</p>
@@ -254,25 +275,34 @@ export function LaunchWizard() {
 
                 {enabled.lock && k === "lock" && (
                   <div className="space-y-2 text-sm">
+                    <p className="text-xs text-neutral-500">Locks only your launch liquidity (the governance NFT). Other LPs can always exit.</p>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-neutral-400">Logic</span>
                       <button className={lockLogic === "AND" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("AND")}>AND</button>
                       <button className={lockLogic === "OR" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("OR")}>OR</button>
                     </div>
+                    <p className="text-xs text-neutral-500">AND = every enabled condition must be met to unlock. OR = any one enabled condition unlocks.</p>
                     <label className="flex flex-wrap items-center gap-2">
                       <input type="checkbox" checked={lockTime} onChange={() => setLockTime((v) => !v)} /> Time — unlock
                       <input className="input inline-block w-16" value={lockDelay} onChange={(e) => setLockDelay(num(e))} /> day(s) after launch ends
                     </label>
+                    <p className="text-xs text-neutral-500">Lock the gov-NFT until this many day(s) after launch ends (min 1 h buffer).</p>
                     <label className="flex flex-wrap items-center gap-2">
                       <input type="checkbox" checked={lockVolume} onChange={() => setLockVolume((v) => !v)} /> Volume — threshold
                       <input className="input inline-block w-28" value={lockVolThreshold} onChange={(e) => setLockVolThreshold(dec(e))} /> {pairSym}
                     </label>
+                    <p className="text-xs text-neutral-500">Unlock once cumulative swap volume (buys + sells, in {pairSym}) reaches this.</p>
                     {!lockTime && !lockVolume && <p className="text-xs text-amber-400">Keep at least one condition.</p>}
                   </div>
                 )}
 
                 {enabled.whitelist && k === "whitelist" && (
-                  <Field label="Whitelist window (min, within launch)"><input className="input" value={wlWindow} onChange={(e) => setWlWindow(num(e))} /></Field>
+                  <Field
+                    label="Whitelist window (min, within launch)"
+                    hint="Only whitelisted addresses can buy/sell/add liquidity for this many minutes after launch (must fit inside the launch window). Removing liquidity is always allowed. Manage the address list later on the Governance page."
+                  >
+                    <input className="input" value={wlWindow} onChange={(e) => setWlWindow(num(e))} />
+                  </Field>
                 )}
               </div>
             ))}
@@ -350,11 +380,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
       <span className="text-xs text-neutral-400">{label}</span>
       {children}
+      {hint && <span className="block text-xs text-neutral-500">{hint}</span>}
     </label>
   );
 }

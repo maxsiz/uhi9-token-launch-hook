@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ConnectButton } from "@/components/ui/ConnectButton";
+import { NetworkSelector } from "@/components/ui/NetworkSelector";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/governance" className="text-neutral-300 hover:text-white">
                   Governance
                 </Link>
+                <NetworkSelector />
                 <ConnectButton />
               </nav>
             </div>
