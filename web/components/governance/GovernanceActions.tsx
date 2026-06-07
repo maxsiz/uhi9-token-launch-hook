@@ -33,6 +33,7 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
   const [wlAddr, setWlAddr] = useState("");
   const [wlEnd, setWlEnd] = useState("");
   const [unlockAt, setUnlockAt] = useState("");
+  const [volThreshold, setVolThreshold] = useState("");
 
   if (!campaign?.initialized) return null;
 
@@ -139,19 +140,60 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
       {en.lock && (
         <div className="card space-y-2">
           <h4 className="text-sm font-semibold">Liquidity lock — relax only</h4>
-          <div className="flex gap-2">
-            <input type="datetime-local" value={unlockAt} onChange={(e) => setUnlockAt(e.target.value)} className="input flex-1" />
-            <button
-              className="btn-ghost"
-              disabled={busy === "unlock" || !unlockAt}
-              onClick={() => run("unlock", () => write("relaxUnlockTime", [pid, toUnix(unlockAt)]))}
-            >
-              Earlier unlock
-            </button>
+          <p className="text-xs text-neutral-500">
+            Logic <span className="text-neutral-300">{campaign.lock.logic === 0 ? "AND" : "OR"}</span> · conditions:{" "}
+            {[campaign.lock.timeEnabled && "time", campaign.lock.volumeEnabled && "volume"].filter(Boolean).join(" + ") || "none"} ·
+            volume {campaign.cumulativeVolume.toString()} / {campaign.lock.unlockVolumeThreshold.toString()}
+          </p>
+
+          {campaign.lock.timeEnabled && (
+            <div className="flex gap-2">
+              <input type="datetime-local" value={unlockAt} onChange={(e) => setUnlockAt(e.target.value)} className="input flex-1" />
+              <button
+                className="btn-ghost"
+                disabled={busy === "unlock" || !unlockAt}
+                onClick={() => run("unlock", () => write("relaxUnlockTime", [pid, toUnix(unlockAt)]))}
+              >
+                Earlier unlock
+              </button>
+            </div>
+          )}
+
+          {campaign.lock.volumeEnabled && (
+            <div className="flex gap-2">
+              <input
+                value={volThreshold}
+                onChange={(e) => setVolThreshold(e.target.value.replace(/[^0-9]/g, ""))}
+                placeholder={`new threshold (raw, < ${campaign.lock.unlockVolumeThreshold.toString()})`}
+                className="input flex-1 font-mono"
+              />
+              <button
+                className="btn-ghost"
+                disabled={busy === "vol" || !volThreshold || !(BigInt(volThreshold) > 0n && BigInt(volThreshold) < campaign.lock.unlockVolumeThreshold)}
+                onClick={() => run("vol", () => write("relaxUnlockVolume", [pid, BigInt(volThreshold)]))}
+              >
+                Lower threshold
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {campaign.lock.logic === 0 && (
+              <button className="btn-ghost" disabled={busy === "or"} onClick={() => run("or", () => write("switchToOr", [pid]))}>
+                Switch logic to OR
+              </button>
+            )}
+            {campaign.lock.timeEnabled && campaign.lock.volumeEnabled && (
+              <>
+                <button className="btn-ghost" disabled={busy === "disT"} onClick={() => run("disT", () => write("disableTimeCondition", [pid]))}>
+                  Disable time condition
+                </button>
+                <button className="btn-ghost" disabled={busy === "disV"} onClick={() => run("disV", () => write("disableVolumeCondition", [pid]))}>
+                  Disable volume condition
+                </button>
+              </>
+            )}
           </div>
-          <button className="btn-ghost" disabled={busy === "or"} onClick={() => run("or", () => write("switchToOr", [pid]))}>
-            Switch lock logic to OR
-          </button>
         </div>
       )}
 
