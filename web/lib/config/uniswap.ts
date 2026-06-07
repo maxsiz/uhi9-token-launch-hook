@@ -29,9 +29,13 @@ export const UNISWAP: Record<SupportedChainId, UniswapAddresses> = {
     poolManager: "0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32",
     positionManager: "0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869",
   },
+  // Unichain mainnet — periphery verified on-chain (codesize > 0, poolManager() matches) 2026-06-07.
   [unichain.id]: {
     poolManager: "0x1F98400000000000000000000000000000000004",
     positionManager: "0x4529A01c7A0410167c5740C487A8DE60232617bf",
+    universalRouter: "0xEf740bf23aCaE26f6492B10de645D6B98dC8Eaf3",
+    quoter: "0x333E3C607B141b18fF6de9f258db6e77fE7491E0",
+    stateView: "0x86e8631A016F9068C3f085fAF484Ee3F5fDee8f2",
   },
   // Unichain Sepolia (testnet) — all verified on-chain (codesize > 0) 2026-06-06.
   [unichainSepolia.id]: {
