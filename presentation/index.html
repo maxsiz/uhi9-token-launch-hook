@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TokenLaunchHook Studio — Hackathon</title>
+
+    <!-- Reveal.js 5.x from CDN (no build step) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+
+    <style>
+      :root {
+        --emerald: #10b981;
+        --emerald-bright: #34d399;
+        --uni-pink: #ff007a;
+      }
+      .reveal {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 34px;
+      }
+      .reveal h1,
+      .reveal h2,
+      .reveal h3 {
+        text-transform: none;
+        letter-spacing: -0.01em;
+      }
+      .reveal h1 { color: #fff; font-size: 1.9em; }
+      .reveal h2 { color: var(--emerald-bright); }
+      .reveal h3 { color: var(--emerald-bright); }
+      .reveal strong { color: var(--emerald-bright); }
+      .reveal em { color: var(--uni-pink); font-style: normal; }
+      .reveal a { color: #60a5fa; }
+      .reveal code,
+      .reveal pre {
+        font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+      }
+      .reveal :not(pre) > code {
+        color: var(--emerald-bright);
+        background: rgba(16, 185, 129, 0.1);
+        padding: 0.1em 0.3em;
+        border-radius: 4px;
+      }
+      .reveal .subtitle { color: #9ca3af; font-size: 0.7em; }
+      .reveal .muted { color: #6b7280; font-size: 0.6em; }
+      /* callback badge chips, reuse with <span class="badge">…</span> */
+      .reveal .badge {
+        display: inline-block;
+        font-family: ui-monospace, monospace;
+        font-size: 0.5em;
+        color: var(--emerald-bright);
+        border: 1px solid rgba(16, 185, 129, 0.5);
+        border-radius: 999px;
+        padding: 0.05em 0.6em;
+        margin-left: 0.3em;
+        vertical-align: middle;
+      }
+      .reveal .pink { color: var(--uni-pink); }
+      .reveal table { font-size: 0.7em; }
+      .reveal section img { border: none; box-shadow: none; }
+      .reveal .divider { color: var(--uni-pink); font-size: 3em; }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <!-- Slides are authored in slides.md (Reveal markdown). Served over http:// so the fetch works. -->
+        <section
+          data-markdown="slides.md"
+          data-separator="^\r?\n---\r?\n$"
+          data-separator-vertical="^\r?\n--\r?\n$"
+          data-separator-notes="^Note:"
+          data-charset="utf-8"
+        ></section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/markdown/markdown.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+    <script>
+      Reveal.initialize({
+        hash: true,
+        slideNumber: "c/t",
+        transition: "fade",
+        controls: true,
+        progress: true,
+        plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+      });
+    </script>
+  </body>
+</html>
