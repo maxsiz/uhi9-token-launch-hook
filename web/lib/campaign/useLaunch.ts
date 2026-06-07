@@ -8,6 +8,7 @@ import { CampaignWrapperAbi, Erc20Abi, Permit2Abi, TokenFactoryAbi } from "@/lib
 import { CONTRACTS } from "@/lib/config/contracts.generated";
 import { PERMIT2 } from "@/lib/config/uniswap";
 import { type SupportedChainId } from "@/lib/config/chains";
+import { decodeContractError } from "@/lib/tx/revert";
 import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "./launch";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
@@ -49,7 +50,8 @@ export function useLaunch(chainId: SupportedChainId) {
     })) as bigint;
     if (allowance >= amount) return;
     setStage(`Approving ${token.slice(0, 8)}… for Permit2`);
-    const hash = await writeContractAsync({ chainId, address: token, abi: Erc20Abi, functionName: "approve", args: [PERMIT2, maxUint256] });
+    const { request } = await client!.simulateContract({ account: address as Address, address: token, abi: Erc20Abi, functionName: "approve", args: [PERMIT2, maxUint256] });
+    const hash = await writeContractAsync(request);
     await client!.waitForTransactionReceipt({ hash });
   }
 
@@ -107,7 +109,8 @@ export function useLaunch(chainId: SupportedChainId) {
     for (const t of prepared.permitTokens) {
       await approvePermit2IfNeeded(t.token, t.amount);
       setStage(`Enabling ${t.token.slice(0, 8)}… on the launcher`);
-      const gh = await writeContractAsync({ chainId, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
+      const { request } = await client.simulateContract({ account: address, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
+      const gh = await writeContractAsync(request);
       await client.waitForTransactionReceipt({ hash: gh });
     }
 
@@ -139,8 +142,7 @@ export function useLaunch(chainId: SupportedChainId) {
     try {
       return await launch(form);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? (e as { shortMessage?: string }).shortMessage ?? e.message.split("\n")[0] : "Launch failed";
-      setError(msg);
+      setError(decodeContractError(e, "Launch failed"));
       setStage(undefined);
       return undefined;
     }

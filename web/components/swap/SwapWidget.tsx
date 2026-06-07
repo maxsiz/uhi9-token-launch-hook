@@ -215,9 +215,16 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
     }
   }
 
+  // Simulate first (eth_call) so a would-be revert is caught before the wallet sends a doomed tx; only
+  // the request the simulation validated is broadcast.
+  async function simulateAndWrite(params: Record<string, unknown>): Promise<Hex> {
+    const { request } = await client!.simulateContract({ account: address, ...params } as never);
+    return writeContractAsync(request as never);
+  }
+
   const onApproveErc20 = () =>
     runWrite(() =>
-      writeContractAsync({
+      simulateAndWrite({
         chainId,
         address: derived.inputCurrency,
         abi: Erc20Abi,
@@ -228,7 +235,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
 
   const onApprovePermit2 = () =>
     runWrite(() =>
-      writeContractAsync({
+      simulateAndWrite({
         chainId,
         address: PERMIT2,
         abi: Permit2Abi,
@@ -253,7 +260,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
     });
     return runWrite(() =>
-      writeContractAsync({
+      simulateAndWrite({
         chainId,
         address: uni.universalRouter as Address,
         abi: UniversalRouterAbi,

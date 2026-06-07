@@ -8,6 +8,7 @@ import { useCampaign } from "@/lib/campaign/useCampaign";
 import { TokenLaunchHookAbi } from "@/lib/config/abi";
 import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
 import { formatUtc, percentToTaxUnits, taxUnitsToPercent, truncateAddress } from "@/lib/format";
+import { decodeContractError } from "@/lib/tx/revert";
 
 function toUnix(local: string): bigint {
   return BigInt(Math.floor(new Date(local).getTime() / 1000));
@@ -65,14 +66,24 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
       setTxHash(hash);
       await refetch?.();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message.split("\n")[0] : "Transaction failed");
+      setErr(decodeContractError(e, "Transaction failed"));
     } finally {
       setBusy(undefined);
     }
   }
 
-  const write = (fn: string, args: readonly unknown[]) =>
-    writeContractAsync({ chainId, address: hook, abi: TokenLaunchHookAbi, functionName: fn, args } as never);
+  // Simulate first (eth_call) so a would-be revert surfaces with its decoded reason instead of a silent
+  // on-chain fail; only send the request the simulation validated.
+  const write = async (fn: string, args: readonly unknown[]): Promise<Hex> => {
+    const { request } = await client!.simulateContract({
+      account: address,
+      address: hook,
+      abi: TokenLaunchHookAbi,
+      functionName: fn,
+      args,
+    } as never);
+    return writeContractAsync(request);
+  };
 
   const en = campaign.enabled;
 
