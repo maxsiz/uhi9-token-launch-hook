@@ -34,6 +34,7 @@ const ENV_RPC: Record<SupportedChainId, string | undefined> = {
  * returns 501 when unconfigured, so viem's `fallback` simply moves on to env/public URLs.
  */
 const PROXY_RPC: Partial<Record<SupportedChainId, string>> = {
+  [unichain.id]: "/api/rpc?chainId=130",
   [unichainSepolia.id]: "/api/rpc?chainId=1301",
 };
 
