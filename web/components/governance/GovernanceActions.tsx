@@ -13,6 +13,13 @@ function toUnix(local: string): bigint {
   return BigInt(Math.floor(new Date(local).getTime() / 1000));
 }
 
+/** UTC echo for a `datetime-local` value (the browser captures it in the user's local TZ). */
+function utcHint(local: string): string | undefined {
+  if (!local) return undefined;
+  const ms = new Date(local).getTime();
+  return Number.isFinite(ms) ? formatUtc(Math.floor(ms / 1000)) : undefined;
+}
+
 /**
  * Governance write actions, gated to the gov-NFT owner during the Active phase (onlyGovernance reverts
  * otherwise). Only the panels for enabled modules render. All mutations are one-way relaxations.
@@ -124,15 +131,18 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
               Remove
             </button>
           </div>
-          <div className="flex gap-2">
-            <input type="datetime-local" value={wlEnd} onChange={(e) => setWlEnd(e.target.value)} className="input flex-1" />
-            <button
-              className="btn-ghost"
-              disabled={busy === "wlEnd" || !wlEnd}
-              onClick={() => run("wlEnd", () => write("relaxWhitelistEndTime", [pid, toUnix(wlEnd)]))}
-            >
-              Shorten window
-            </button>
+          <div className="space-y-1">
+            <div className="flex gap-2">
+              <input type="datetime-local" value={wlEnd} onChange={(e) => setWlEnd(e.target.value)} className="input flex-1" />
+              <button
+                className="btn-ghost"
+                disabled={busy === "wlEnd" || !wlEnd}
+                onClick={() => run("wlEnd", () => write("relaxWhitelistEndTime", [pid, toUnix(wlEnd)]))}
+              >
+                Shorten window
+              </button>
+            </div>
+            {utcHint(wlEnd) && <p className="text-xs text-neutral-500">= {utcHint(wlEnd)}</p>}
           </div>
         </div>
       )}
@@ -147,15 +157,18 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
           </p>
 
           {campaign.lock.timeEnabled && (
-            <div className="flex gap-2">
-              <input type="datetime-local" value={unlockAt} onChange={(e) => setUnlockAt(e.target.value)} className="input flex-1" />
-              <button
-                className="btn-ghost"
-                disabled={busy === "unlock" || !unlockAt}
-                onClick={() => run("unlock", () => write("relaxUnlockTime", [pid, toUnix(unlockAt)]))}
-              >
-                Earlier unlock
-              </button>
+            <div className="space-y-1">
+              <div className="flex gap-2">
+                <input type="datetime-local" value={unlockAt} onChange={(e) => setUnlockAt(e.target.value)} className="input flex-1" />
+                <button
+                  className="btn-ghost"
+                  disabled={busy === "unlock" || !unlockAt}
+                  onClick={() => run("unlock", () => write("relaxUnlockTime", [pid, toUnix(unlockAt)]))}
+                >
+                  Earlier unlock
+                </button>
+              </div>
+              {utcHint(unlockAt) && <p className="text-xs text-neutral-500">= {utcHint(unlockAt)}</p>}
             </div>
           )}
 
