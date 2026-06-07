@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useChainId } from "wagmi";
 import type { Hex } from "viem";
 import { CONTRACTS, isDeployed } from "@/lib/config/contracts.generated";
 import { isSupportedChain } from "@/lib/config/chains";
 import { HookActivityPanel } from "@/components/hook/HookActivityPanel";
-import { HookExplainer } from "@/components/hook/HookExplainer";
+import { CampaignSummary } from "@/components/governance/CampaignSummary";
+import { GovernanceActions } from "@/components/governance/GovernanceActions";
+import { WalletCampaignPicker } from "@/components/governance/WalletCampaignPicker";
 
 export function GovernanceDashboard() {
   const chainId = useChainId();
@@ -24,6 +27,10 @@ export function GovernanceDashboard() {
         </div>
       )}
 
+      {deployed && isSupportedChain(chainId) && (
+        <WalletCampaignPicker chainId={chainId} selected={pid} onSelect={setPid} />
+      )}
+
       <div className="card space-y-2">
         <label className="text-sm font-medium">Pool ID</label>
         <input
@@ -38,22 +45,22 @@ export function GovernanceDashboard() {
         </p>
       </div>
 
-      {valid && hook && (
+      {valid && hook && isSupportedChain(chainId) && (
         <div className="grid gap-4 md:grid-cols-2">
-          <HookActivityPanel hook={hook} pid={pid as Hex} />
+          <div className="space-y-4">
+            <CampaignSummary chainId={chainId} pid={pid as Hex} />
+            <HookActivityPanel hook={hook} pid={pid as Hex} />
+            <Link href={`/swap/${chainId}/${pid}`} className="btn-primary inline-block">
+              Trade this pool →
+            </Link>
+          </div>
           <div className="space-y-3">
             <h3 className="text-sm font-semibold">Governance actions</h3>
             <p className="text-xs text-neutral-500">
               Available to the governance-NFT owner during the Active phase. Each action is badged with the hook
               callback it influences.
             </p>
-            <HookExplainer feature="gov.taxOverride" />
-            <HookExplainer feature="gov.relaxLock" />
-            <HookExplainer feature="gov.whitelist" />
-            <p className="text-xs text-neutral-600">
-              Scaffold: wire <code className="font-mono">setBuyTaxOverride</code> / <code className="font-mono">relax*</code> /
-              whitelist setters behind <code className="font-mono">OwnerGuard</code> (DESIGN.md §4.6).
-            </p>
+            <GovernanceActions chainId={chainId} pid={pid as Hex} hook={hook} />
           </div>
         </div>
       )}

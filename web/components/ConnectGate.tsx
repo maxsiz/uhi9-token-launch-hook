@@ -2,7 +2,7 @@
 
 import { type ReactNode } from "react";
 import { useAccount, useChainId, useSwitchChain, useBytecode } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ConnectButton } from "@/components/ui/ConnectButton";
 import { SUPPORTED_CHAINS, isSupportedChain } from "@/lib/config/chains";
 
 /**

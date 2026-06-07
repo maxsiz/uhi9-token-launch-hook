@@ -67,7 +67,6 @@ metadata. Next gives the smoothest Vercel deploy and an optional server RPC prox
 | `next` | `^14` | App framework (App Router) |
 | `wagmi` | `^2` | React hooks for accounts/chains/contracts |
 | `viem` | `^2` | Encoding, `simulateContract`, reads, EIP-712 typed-data |
-| `@rainbow-me/rainbowkit` | `^2` | Connect button + modal; **auto-detects MetaMask & Rabby via EIP-6963** |
 | `@uniswap/v4-sdk` | `^1` | `Pool`, `Position`, `TickMath`, `encodeSqrtRatioX96`, `nearestUsableTick` |
 | `@uniswap/sdk-core` | `^5` | `Token`, `Ether`, `CurrencyAmount`, `Price` |
 | `@tanstack/react-query` | `^5` | Read caching (wagmi peer dep) |
@@ -75,9 +74,10 @@ metadata. Next gives the smoothest Vercel deploy and an optional server RPC prox
 | `zod` | latest | Validation schema mirroring contract reverts |
 | `tailwindcss` | `^3` | Styling |
 
-**Wallets:** MetaMask and Rabby are both injected EIP-1193 providers discovered through
-**EIP-6963**. wagmi's multi-injected discovery + RainbowKit surface both automatically with **no
-per-wallet configuration**. WalletConnect (mobile) is optional but requires a project id.
+**Wallets: injected-only.** MetaMask and Rabby are injected EIP-1193 providers discovered through
+**EIP-6963**; wagmi's multi-injected discovery surfaces both automatically with **no per-wallet
+configuration** and a small custom connect button (`components/ui/ConnectButton.tsx`). No WalletConnect,
+no RainbowKit, no project id.
 
 **Permit2:** hand-rolled EIP-712 via `viem.signTypedData` (the `PermitBatch` typed-data is small
 and stable) — avoids a heavier SDK dependency. See §4.4.
@@ -91,7 +91,7 @@ web/
   app/
     layout.tsx                 # html shell, <Providers>, global metadata (title/favicon/OG)
     page.tsx                   # landing: explain, pick chain, CTA → /launch | /governance
-    providers.tsx              # "use client": WagmiProvider, QueryClientProvider, RainbowKitProvider
+    providers.tsx              # "use client": WagmiProvider + QueryClientProvider (injected-only wagmi config)
     launch/page.tsx            # Launch Wizard host (step machine)
     governance/page.tsx        # Governance Dashboard (pool lookup + actions)
     swap/[chainId]/[pid]/page.tsx # Per-campaign Uniswap-style swap widget (fallback to Uniswap UI) — see task_019 (#19)
@@ -334,8 +334,8 @@ transaction built.
 
 ## 6. Web3 UX Best Practices
 
-- **Connect-button states.** Disconnected → "Connect Wallet" (RainbowKit). Connected → truncated
-  address + ENS + chain pill. Wrong chain → "Switch network". All onchain actions behind `ConnectGate`.
+- **Connect-button states.** Disconnected → "Connect <injected wallet>" (custom button). Connected →
+  truncated address + disconnect. Wrong chain → "Switch network". All onchain actions behind `ConnectGate`.
 - **EOA-only banner (critical).** Before the wizard, `getBytecode(connectedAddress)`; if code length
   > 0, show a blocking banner: *"This launch must be sent from an EOA (MetaMask/Rabby).
   Smart-contract wallets are not supported for launch."* Block only the wizard, not governance.
@@ -420,8 +420,8 @@ config sub-forms. "Custom" exposes all four toggles.
 - **Build:** default `next build`, with `"prebuild": "tsx scripts/gen-contracts.ts"` for address
   codegen. Because ABIs are committed under `web/lib/config/abi/`, the build needs **no Foundry**.
 - **Env vars:**
-  - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` — required by RainbowKit (even for injected-only).
-  - `NEXT_PUBLIC_RPC_URL_1 / _8453 / _42161 / _130` — primary RPCs (public on client), **or** omit
+  - Wallets are injected-only — **no** WalletConnect project id needed.
+  - `NEXT_PUBLIC_RPC_URL_1 / _8453 / _42161 / _130 / _1301` — primary RPCs (public on client), **or** omit
     these and route through `/app/api/rpc` with server-only `RPC_URL_*` to keep keys private.
   - Public fallback RPCs hardcoded in `chains.ts` for the viem `fallback` transport.
 - **Preview vs Prod:** preview deploys per PR/branch; production on the default branch. Same env set,

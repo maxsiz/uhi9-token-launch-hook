@@ -8,6 +8,7 @@ const SERVER_RPC: Record<string, string | undefined> = {
   "8453": process.env.RPC_URL_8453,
   "42161": process.env.RPC_URL_42161,
   "130": process.env.RPC_URL_130,
+  "1301": process.env.RPC_URL_1301,
 };
 
 export async function POST(req: Request) {

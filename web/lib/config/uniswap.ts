@@ -1,12 +1,22 @@
 import type { Address } from "viem";
-import { mainnet, base, arbitrum, unichain } from "wagmi/chains";
+import { mainnet, base, arbitrum, unichain, unichainSepolia } from "wagmi/chains";
 import type { SupportedChainId } from "./chains";
 
+export interface UniswapAddresses {
+  poolManager: Address;
+  positionManager: Address;
+  /** Swap-side periphery — present where the swap page is wired (verified on-chain). */
+  universalRouter?: Address;
+  quoter?: Address; // V4Quoter
+  stateView?: Address;
+}
+
 /**
- * Canonical Uniswap v4 PoolManager / PositionManager per chain.
- * Mirror of `script/MineSalt.s.sol` HookDeployLib.canonical() — verified 2026-05-31.
+ * Canonical Uniswap v4 addresses per chain. PoolManager/PositionManager mirror
+ * `script/MineSalt.s.sol` HookDeployLib.canonical(). Swap periphery (UniversalRouter/V4Quoter/
+ * StateView) is filled where the swap UI runs.
  */
-export const UNISWAP: Record<SupportedChainId, { poolManager: Address; positionManager: Address }> = {
+export const UNISWAP: Record<SupportedChainId, UniswapAddresses> = {
   [mainnet.id]: {
     poolManager: "0x000000000004444c5dc75cB358380D2e3dE08A90",
     positionManager: "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e",
@@ -22,6 +32,14 @@ export const UNISWAP: Record<SupportedChainId, { poolManager: Address; positionM
   [unichain.id]: {
     poolManager: "0x1F98400000000000000000000000000000000004",
     positionManager: "0x4529A01c7A0410167c5740C487A8DE60232617bf",
+  },
+  // Unichain Sepolia (testnet) — all verified on-chain (codesize > 0) 2026-06-06.
+  [unichainSepolia.id]: {
+    poolManager: "0x00B036B58a818B1BC34d502D3fE730Db729e62AC",
+    positionManager: "0xf969Aee60879C54bAAed9F3eD26147Db216Fd664",
+    universalRouter: "0xf70536B3bcC1bD1a972dc186A2cf84cC6da6Be5D",
+    quoter: "0x56DCD40A3F2d466F48e7F48bDBE5Cc9B92Ae4472",
+    stateView: "0xc199F1072a74D4e905ABa1A84d9a45E2546B6222",
   },
 };
 

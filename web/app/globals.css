@@ -25,3 +25,7 @@ body {
 .btn-ghost {
   @apply btn border border-neutral-700 text-neutral-200 hover:bg-neutral-800;
 }
+
+.input {
+  @apply w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm;
+}

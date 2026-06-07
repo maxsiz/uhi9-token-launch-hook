@@ -15,6 +15,15 @@ export function toWei(human: string, decimals = 18): bigint {
   return parseUnits(human || "0", decimals);
 }
 
+/**
+ * Human-readable price/number without scientific notation (e.g. 0.0000005 instead of 5e-7).
+ * Returns "—" for non-finite or non-positive inputs. Caps at 6 significant digits.
+ */
+export function formatPriceHuman(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  return n.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+}
+
 /** V4 fee units → percent. 100000 units == 10%. */
 export function taxUnitsToPercent(units: number): number {
   return units / 10_000;
@@ -29,4 +38,14 @@ export const MAX_TAX_UNITS = 100_000; // 10%
 
 export function isZeroAddress(addr?: Address): boolean {
   return !addr || addr === "0x0000000000000000000000000000000000000000";
+}
+
+/**
+ * Format a unix timestamp (seconds) as an unambiguous UTC string `YYYY-MM-DD HH:MM UTC`.
+ * Locale-independent — avoids the browser's mm/dd/yyyy default. Accepts bigint or number.
+ */
+export function formatUtc(unixSeconds: bigint | number): string {
+  const ms = Number(unixSeconds) * 1000;
+  if (!Number.isFinite(ms)) return "—";
+  return `${new Date(ms).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }

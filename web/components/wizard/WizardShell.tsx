@@ -1,57 +1,222 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useAccount, useChainId } from "wagmi";
+import { parseUnits, type Address } from "viem";
+
 import { PRESETS, type PresetId } from "@/lib/campaign/presets";
-import type { EnabledMechanisms } from "@/lib/campaign/types";
+import { UnlockLogic, type EnabledMechanisms } from "@/lib/campaign/types";
 import { hookPlan } from "@/lib/hook/hookMap";
 import { HookExplainer } from "@/components/hook/HookExplainer";
 import { HookBadge } from "@/components/hook/HookBadge";
+import { isSupportedChain, EXPLORER, type SupportedChainId } from "@/lib/config/chains";
+import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "@/lib/campaign/launch";
+import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
+import { useErc20Meta, type Erc20Meta } from "@/lib/useErc20Meta";
+import { formatAmount, formatPriceHuman, truncateAddress } from "@/lib/format";
+
+const num = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9]/g, "");
+const dec = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9.]/g, "");
+const isAddr = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s);
 
 const STEPS = ["Token", "Pool & price", "Mechanisms", "Review", "Sign"] as const;
 type StepIndex = 0 | 1 | 2 | 3 | 4;
-
-const FEATURE_OF: Record<keyof EnabledMechanisms, "antiSnipe" | "tax" | "lock" | "whitelist"> = {
-  antiSnipe: "antiSnipe",
-  tax: "tax",
-  lock: "lock",
-  whitelist: "whitelist",
-};
+const FEATURES: (keyof EnabledMechanisms)[] = ["antiSnipe", "tax", "lock", "whitelist"];
+const ZERO = "0x0000000000000000000000000000000000000000" as Address;
 
 export function LaunchWizard() {
+  const chainId = useChainId();
+  const { address } = useAccount();
+  const supported = isSupportedChain(chainId);
+
   const [step, setStep] = useState<StepIndex>(0);
-  const [presetId, setPresetId] = useState<PresetId>("memecoin");
-  const [enabled, setEnabled] = useState<EnabledMechanisms>(PRESETS[0].enabled);
+  const [presetId, setPresetId] = useState<PresetId>("custom");
+  const [enabled, setEnabled] = useState<EnabledMechanisms>({ antiSnipe: false, tax: false, lock: false, whitelist: false });
+
+  // form state
+  const [tokenMode, setTokenMode] = useState<"new" | "existing">("new");
+  const [name, setName] = useState("Demo Token");
+  const [symbol, setSymbol] = useState("DEMO");
+  const [supplyStr, setSupplyStr] = useState("1000000");
+  const [existingToken, setExistingToken] = useState("");
+  const [pairMode, setPairMode] = useState<"native" | "erc20">("native");
+  const [pairAddress, setPairAddress] = useState("");
+  const [seedToken, setSeedToken] = useState("100000");
+  const [seedPair, setSeedPair] = useState("0.05");
+  const [durationDays, setDurationDays] = useState("1");
+
+  // module config state (human units)
+  const [asDuration, setAsDuration] = useState("60"); // minutes
+  const [asMaxBuy, setAsMaxBuy] = useState("1"); // pair units
+  const [taxBuy, setTaxBuy] = useState("3");
+  const [taxSell, setTaxSell] = useState("5");
+  const [taxBase, setTaxBase] = useState("0.3");
+  const [taxDecay, setTaxDecay] = useState("7"); // days
+  const [lockLogic, setLockLogic] = useState<"AND" | "OR">("AND");
+  const [lockTime, setLockTime] = useState(true);
+  const [lockDelay, setLockDelay] = useState("1"); // days after launch ends
+  const [lockVolume, setLockVolume] = useState(false);
+  const [lockVolThreshold, setLockVolThreshold] = useState("0");
+  const [wlWindow, setWlWindow] = useState("30"); // minutes
+
+  const modules: ModuleConfigInput = useMemo(
+    () => ({
+      antiSnipe: { durationMinutes: Number(asDuration) || 0, maxBuyHuman: asMaxBuy },
+      tax: { initialBuyPct: Number(taxBuy) || 0, initialSellPct: Number(taxSell) || 0, basePct: Number(taxBase) || 0, decayDays: Number(taxDecay) || 0 },
+      lock: {
+        logic: lockLogic === "OR" ? UnlockLogic.OR : UnlockLogic.AND,
+        timeEnabled: lockTime,
+        unlockDelayDays: Number(lockDelay) || 0,
+        volumeEnabled: lockVolume,
+        volumeThresholdHuman: lockVolThreshold,
+      },
+    }),
+    [asDuration, asMaxBuy, taxBuy, taxSell, taxBase, taxDecay, lockLogic, lockTime, lockDelay, lockVolume, lockVolThreshold]
+  );
+  const whitelistWindowMinutes = Number(wlWindow) || 30;
+
+  // Auto-resolve ERC-20 metadata (decimals/name/symbol) + balance for pasted addresses.
+  const existingMeta = useErc20Meta(chainId, isAddr(existingToken) ? (existingToken as Address) : undefined);
+  const pairMeta = useErc20Meta(chainId, pairMode === "erc20" && isAddr(pairAddress) ? (pairAddress as Address) : undefined);
+  const existingDecimals = existingMeta.decimals ?? 18;
+  const pairDecimals = pairMeta.decimals ?? 18;
+
+  const pairSym = pairMode === "native" ? "ETH" : pairMeta.symbol ?? "pair";
+  const tokenSym = tokenMode === "new" ? symbol || "token" : existingMeta.symbol ?? "token";
+  // Initial price from the seed ratio (pair currency per 1 token), and its reverse.
+  const pairPerToken = Number(seedPair) / Number(seedToken);
+  const tokenPerPair = Number(seedToken) / Number(seedPair);
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
+  const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
 
   function choosePreset(id: PresetId) {
     setPresetId(id);
-    const p = PRESETS.find((x) => x.id === id)!;
-    setEnabled(p.enabled);
+    setEnabled(PRESETS.find((x) => x.id === id)!.enabled);
   }
   function toggle(k: keyof EnabledMechanisms) {
     setPresetId("custom");
     setEnabled((e) => ({ ...e, [k]: !e[k] }));
   }
 
+  const form: WizardForm = {
+    tokenMode,
+    name,
+    symbol,
+    totalSupply: (() => {
+      try {
+        return parseUnits(supplyStr || "0", 18);
+      } catch {
+        return 0n;
+      }
+    })(),
+    existingToken: (existingToken || ZERO) as Address,
+    existingTokenDecimals: existingDecimals,
+    pairMode,
+    pairAddress: (pairAddress || ZERO) as Address,
+    pairDecimals,
+    seedToken,
+    seedPair,
+    durationDays: Number(durationDays) || 1,
+    enabled,
+    modules,
+    whitelistWindowMinutes,
+  };
+
+  // Best-effort preview (orientation for a fresh ERC-20-paired token is only exact post-deploy).
+  const preview = useMemo(() => {
+    try {
+      const input: LaunchFormInput = {
+        newToken: tokenMode === "new" ? { name, symbol, totalSupply: form.totalSupply } : undefined,
+        existingToken: tokenMode === "existing" ? (existingToken as Address) : undefined,
+        tokenAddress: tokenMode === "existing" ? (existingToken as Address) : undefined,
+        tokenDecimals: tokenMode === "existing" ? existingDecimals : 18,
+        pair: pairMode === "native" ? { native: true } : { address: pairAddress as Address, decimals: pairDecimals },
+        seedTokenHuman: seedToken,
+        seedPairHuman: seedPair,
+        launchDurationDays: Number(durationDays) || 1,
+        tickSpacing: 60,
+        staticFee: 3000,
+        rangeTicks: 6000,
+        slippageBps: 50,
+        lpRecipient: (address ?? ZERO) as Address,
+        enabled,
+        modules,
+        whitelistWindowMinutes,
+      };
+      return prepareLaunch(input, Math.floor(Date.now() / 1000));
+    } catch {
+      return undefined;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingMeta.decimals, pairMode, pairAddress, pairMeta.decimals, seedToken, seedPair, durationDays, address, enabled, modules, whitelistWindowMinutes]);
+
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
       <ol className="flex flex-wrap gap-2 text-sm">
         {STEPS.map((label, i) => (
-          <li
-            key={label}
-            className={`rounded-full px-3 py-1 ${
-              i === step ? "bg-blue-600 text-white" : i < step ? "bg-neutral-800 text-neutral-300" : "bg-neutral-900 text-neutral-500"
-            }`}
-          >
+          <li key={label} className={`rounded-full px-3 py-1 ${i === step ? "bg-blue-600 text-white" : i < step ? "bg-neutral-800 text-neutral-300" : "bg-neutral-900 text-neutral-500"}`}>
             {i + 1}. {label}
           </li>
         ))}
       </ol>
 
-      {step === 0 && <PlaceholderStep title="Token" note="Deploy a new ERC-20 (name / symbol / total supply) or paste an existing token address." feature="launch.bootstrap" />}
-      {step === 1 && <PlaceholderStep title="Pool & price" note="Pick the pair (native ETH or ERC-20), the initial price, the seed amounts, and the range. priceMath.ts (v4-sdk) derives sqrtPrice / ticks / liquidity." feature="launch.bootstrap" />}
+      {step === 0 && (
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Token</h3>
+            <HookBadge feature="launch.bootstrap" />
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button className={tokenMode === "new" ? "btn-primary" : "btn-ghost"} onClick={() => setTokenMode("new")}>Deploy new</button>
+            <button className={tokenMode === "existing" ? "btn-primary" : "btn-ghost"} onClick={() => setTokenMode("existing")}>Existing token</button>
+          </div>
+          {tokenMode === "new" ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+              <input className="input" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Symbol" />
+              <input className="input" value={supplyStr} onChange={(e) => setSupplyStr(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="Total supply" />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <input className="input font-mono" value={existingToken} onChange={(e) => setExistingToken(e.target.value.trim())} placeholder="0x token address" />
+              <MetaHint addr={existingToken} meta={existingMeta} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Pool &amp; price</h3>
+            <HookBadge feature="launch.bootstrap" />
+          </div>
+          <div className="flex gap-2 text-sm">
+            <button className={pairMode === "native" ? "btn-primary" : "btn-ghost"} onClick={() => setPairMode("native")}>Native ETH</button>
+            <button className={pairMode === "erc20" ? "btn-primary" : "btn-ghost"} onClick={() => setPairMode("erc20")}>ERC-20</button>
+          </div>
+          {pairMode === "erc20" && (
+            <div className="space-y-1">
+              <input className="input font-mono" value={pairAddress} onChange={(e) => setPairAddress(e.target.value.trim())} placeholder="0x pair token (e.g. USDC)" />
+              <MetaHint addr={pairAddress} meta={pairMeta} />
+            </div>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field label="Seed token amount" hint="How many of your tokens seed the pool. With the pair amount it sets the starting price.">
+              <input className="input" value={seedToken} onChange={(e) => setSeedToken(e.target.value.replace(/[^0-9.]/g, ""))} />
+            </Field>
+            <Field label={`Seed pair amount (${pairMode === "native" ? "ETH" : "pair"})`} hint={`${pairMode === "native" ? "ETH" : "Pair currency"} that seeds the pool. Starting price ≈ pair ÷ token.`}>
+              <input className="input" value={seedPair} onChange={(e) => setSeedPair(e.target.value.replace(/[^0-9.]/g, ""))} />
+            </Field>
+          </div>
+          <Field label="Launch duration (days, ≥ 1)" hint="How long fair-launch rules stay enforceable (1–365 d). Governance can only relax params during this Active window; after it everything freezes.">
+            <input className="input" value={durationDays} onChange={(e) => setDurationDays(e.target.value.replace(/[^0-9]/g, ""))} />
+          </Field>
+          <p className="text-xs text-neutral-500">Initial price ≈ {formatPriceHuman(pairPerToken)} {pairSym} per {tokenSym} (set by the seed ratio).</p>
+        </div>
+      )}
 
       {step === 2 && (
         <div className="space-y-5">
@@ -59,96 +224,190 @@ export function LaunchWizard() {
             <h3 className="font-semibold">Choose a preset</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               {PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => choosePreset(p.id)}
-                  className={`card text-left transition ${presetId === p.id ? "border-blue-600" : "hover:border-neutral-600"}`}
-                >
+                <button key={p.id} onClick={() => choosePreset(p.id)} className={`card text-left transition ${presetId === p.id ? "border-blue-600" : "hover:border-neutral-600"}`}>
                   <div className="font-medium">{p.label}</div>
                   <div className="text-sm text-neutral-400">{p.description}</div>
                 </button>
               ))}
             </div>
           </div>
-
           <div className="space-y-2">
             <h3 className="font-semibold">Mechanisms</h3>
-            {(Object.keys(FEATURE_OF) as (keyof EnabledMechanisms)[]).map((k) => (
-              <label key={k} className="flex items-center gap-3 rounded-lg border border-neutral-800 p-3">
-                <input type="checkbox" checked={enabled[k]} onChange={() => toggle(k)} />
-                <span className="flex-1 capitalize">{k}</span>
-                <HookBadge feature={FEATURE_OF[k]} />
-              </label>
+            {FEATURES.map((k) => (
+              <div key={k} className="space-y-3 rounded-lg border border-neutral-800 p-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={enabled[k]} onChange={() => toggle(k)} />
+                  <span className="flex-1 capitalize">{k}</span>
+                  <HookBadge feature={k} />
+                </label>
+
+                {enabled.antiSnipe && k === "antiSnipe" && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Field label="Window (min, ≤ 1440)" hint="Anti-snipe stays active this long after launch (max 24 h). After it expires, buy size is unrestricted.">
+                      <input className="input" value={asDuration} onChange={(e) => setAsDuration(num(e))} />
+                    </Field>
+                    <Field
+                      label={`Max buy / tx (${pairSym})`}
+                      hint={`Largest single buy, measured by ${pairSym} spent (exact-input). Larger buys revert; exact-output buys are blocked during the window. Sells are never limited. 0 = blocks all buys.`}
+                    >
+                      <input className="input" value={asMaxBuy} onChange={(e) => setAsMaxBuy(dec(e))} />
+                    </Field>
+                  </div>
+                )}
+
+                {enabled.tax && k === "tax" && (
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      <Field label="Buy %" hint="Tax on buys at launch (max 10%), charged as the dynamic LP fee. Decays linearly to Base %.">
+                        <input className="input" value={taxBuy} onChange={(e) => setTaxBuy(dec(e))} />
+                      </Field>
+                      <Field label="Sell %" hint="Tax on sells at launch (max 10%); usually higher than buy. Decays to Base %.">
+                        <input className="input" value={taxSell} onChange={(e) => setTaxSell(dec(e))} />
+                      </Field>
+                      <Field label="Base %" hint="Floor tax after decay finishes — and the permanent fee if Decay = 0. Must be ≤ both buy and sell.">
+                        <input className="input" value={taxBase} onChange={(e) => setTaxBase(dec(e))} />
+                      </Field>
+                      <Field label="Decay (days)" hint="Time for the tax to fall linearly from initial to Base. 0 = no decay (always Base).">
+                        <input className="input" value={taxDecay} onChange={(e) => setTaxDecay(dec(e))} />
+                      </Field>
+                    </div>
+                    {(Number(taxBase) > Number(taxBuy) || Number(taxBase) > Number(taxSell)) && (
+                      <p className="text-xs text-amber-400">Base % must be ≤ both initial taxes.</p>
+                    )}
+                    {(Number(taxBuy) > 10 || Number(taxSell) > 10) && <p className="text-xs text-amber-400">Max tax is 10%.</p>}
+                  </>
+                )}
+
+                {enabled.lock && k === "lock" && (
+                  <div className="space-y-2 text-sm">
+                    <p className="text-xs text-neutral-500">Locks only your launch liquidity (the governance NFT). Other LPs can always exit.</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">Logic</span>
+                      <button className={lockLogic === "AND" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("AND")}>AND</button>
+                      <button className={lockLogic === "OR" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("OR")}>OR</button>
+                    </div>
+                    <p className="text-xs text-neutral-500">AND = every enabled condition must be met to unlock. OR = any one enabled condition unlocks.</p>
+                    <label className="flex flex-wrap items-center gap-2">
+                      <input type="checkbox" checked={lockTime} onChange={() => setLockTime((v) => !v)} /> Time — unlock
+                      <input className="input inline-block w-16" value={lockDelay} onChange={(e) => setLockDelay(num(e))} /> day(s) after launch ends
+                    </label>
+                    <p className="text-xs text-neutral-500">Lock the gov-NFT until this many day(s) after launch ends (min 1 h buffer).</p>
+                    <label className="flex flex-wrap items-center gap-2">
+                      <input type="checkbox" checked={lockVolume} onChange={() => setLockVolume((v) => !v)} /> Volume — threshold
+                      <input className="input inline-block w-28" value={lockVolThreshold} onChange={(e) => setLockVolThreshold(dec(e))} /> {pairSym}
+                    </label>
+                    <p className="text-xs text-neutral-500">Unlock once cumulative swap volume (buys + sells, in {pairSym}) reaches this.</p>
+                    {!lockTime && !lockVolume && <p className="text-xs text-amber-400">Keep at least one condition.</p>}
+                  </div>
+                )}
+
+                {enabled.whitelist && k === "whitelist" && (
+                  <Field
+                    label="Whitelist window (min, within launch)"
+                    hint="Only whitelisted addresses can buy/sell/add liquidity for this many minutes after launch (must fit inside the launch window). Removing liquidity is always allowed. Manage the address list later on the Governance page."
+                  >
+                    <input className="input" value={wlWindow} onChange={(e) => setWlWindow(num(e))} />
+                  </Field>
+                )}
+              </div>
             ))}
           </div>
-
-          {/* The demo highlight: which hook callbacks this config will run */}
-          <HookPlan plan={plan} />
+          <div className="card">
+            <h4 className="mb-2 text-sm font-semibold">Hook plan — what runs on-chain</h4>
+            <div className="space-y-2">{plan.map((f) => <HookExplainer key={f.key} feature={f.key} />)}</div>
+          </div>
         </div>
       )}
 
       {step === 3 && (
         <div className="space-y-4">
-          <h3 className="font-semibold">Review — Hook plan</h3>
-          <p className="text-sm text-neutral-400">
-            With this configuration, the following hook callbacks will run on your pool. A
-            <code className="mx-1 font-mono">simulateContract</code> dry-run gates the final sign step.
-          </p>
-          <div className="space-y-2">
-            {plan.map((f) => (
-              <HookExplainer key={f.key} feature={f.key} />
-            ))}
-          </div>
+          <h3 className="font-semibold">Review</h3>
+          {preview ? (
+            <div className="card space-y-1 text-sm">
+              <Row label="Token">{tokenMode === "new" ? `${name} (${symbol}), new` : `${existingMeta.symbol ? existingMeta.symbol + " " : ""}${truncateAddress(existingToken)}`}</Row>
+              <Row label="Pair">{pairMode === "native" ? "native ETH" : `${pairMeta.symbol ? pairMeta.symbol + " " : ""}${truncateAddress(pairAddress)}`}</Row>
+              <Row label="Fee">{preview.params.fee === 0x800000 ? "dynamic (tax)" : `${preview.params.fee / 10000}%`}</Row>
+              <Row label="Initial price">
+                {formatPriceHuman(pairPerToken)} {pairSym}/{tokenSym} · {formatPriceHuman(tokenPerPair)} {tokenSym}/{pairSym}
+              </Row>
+              <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
+              <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
+              <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, preview.decimals0, 4)} / {formatAmount(preview.params.amount1Max, preview.decimals1, 4)}</Row>
+              {preview.value > 0n && <Row label="ETH value">{formatAmount(preview.value, 18, 6)}</Row>}
+            </div>
+          ) : (
+            <p className="text-sm text-amber-300">Fill in token, pair and seed amounts to preview the launch.</p>
+          )}
+          <div className="space-y-2">{plan.map((f) => <HookExplainer key={f.key} feature={f.key} />)}</div>
         </div>
       )}
 
       {step === 4 && (
-        <div className="card space-y-2 text-sm">
-          <p className="font-medium">Sign</p>
-          <p className="text-neutral-400">
-            Scaffold: wire <code className="font-mono">priceMath.ts</code>,{" "}
-            <code className="font-mono">buildParams.ts</code> and <code className="font-mono">permit2.ts</code>, then
-            <code className="mx-1 font-mono">simulateContract</code> → <code className="font-mono">writeContract</code>{" "}
-            against <code className="font-mono">CampaignWrapper.launchCampaign</code>. On success the receipt is
-            passed to <code className="font-mono">&lt;HookCallTrace/&gt;</code> to prove the hook ran.
-          </p>
+        <div className="card space-y-3 text-sm">
+          <p className="font-medium">Sign &amp; launch</p>
+          {!supported && <p className="text-amber-300">Connect to a supported chain.</p>}
+          {result ? (
+            <div className="space-y-2">
+              <p className="text-emerald-400">Campaign launched ✓</p>
+              <p className="font-mono text-xs break-all">PoolId: {result.pid}</p>
+              <div className="flex gap-2">
+                <Link className="btn-primary" href={`/swap/${chainId}/${result.pid}`}>Trade →</Link>
+                <a className="btn-ghost" href={`${EXPLORER[chainId as SupportedChainId]}/tx/${result.hash}`} target="_blank" rel="noreferrer">View tx ↗</a>
+              </div>
+              <p className="text-xs text-neutral-500">Manage it on the Governance page (paste the PoolId above).</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-neutral-400">
+                Deploys the token (if new + ERC-20 pair), signs Permit2 (if pulling ERC-20s), then
+                <code className="mx-1 font-mono">simulate → launchCampaign</code>. Fresh token + native ETH needs no Permit2.
+              </p>
+              <button className="btn-primary" disabled={!supported || !!stage} onClick={() => run(form)}>
+                {stage ?? "Launch campaign"}
+              </button>
+              {error && <p className="text-xs text-red-400">{error}</p>}
+            </>
+          )}
         </div>
       )}
 
       <div className="flex justify-between">
-        <button className="btn-ghost" disabled={step === 0} onClick={() => setStep((s) => (s - 1) as StepIndex)}>
-          Back
-        </button>
-        <button className="btn-primary" disabled={step === 4} onClick={() => setStep((s) => (s + 1) as StepIndex)}>
-          Next
-        </button>
+        <button className="btn-ghost" disabled={step === 0} onClick={() => setStep((s) => (s - 1) as StepIndex)}>Back</button>
+        <button className="btn-primary" disabled={step === 4} onClick={() => setStep((s) => (s + 1) as StepIndex)}>Next</button>
       </div>
     </div>
   );
 }
 
-function HookPlan({ plan }: { plan: ReturnType<typeof hookPlan> }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="card">
-      <h4 className="mb-2 text-sm font-semibold">Hook plan — what runs on-chain</h4>
-      <div className="space-y-2">
-        {plan.map((f) => (
-          <HookExplainer key={f.key} feature={f.key} />
-        ))}
-      </div>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-neutral-400">{label}</span>
+      <span className="font-mono text-neutral-200">{children}</span>
     </div>
   );
 }
 
-function PlaceholderStep({ title, note, feature }: { title: string; note: string; feature: "launch.bootstrap" }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="card space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{title}</h3>
-        <HookBadge feature={feature} />
-      </div>
-      <p className="text-sm text-neutral-400">{note}</p>
-      <p className="text-xs text-neutral-600">Scaffold placeholder — form fields wired in a later phase (DESIGN.md §9).</p>
-    </div>
+    <label className="block space-y-1">
+      <span className="text-xs text-neutral-400">{label}</span>
+      {children}
+      {hint && <span className="block text-xs text-neutral-500">{hint}</span>}
+    </label>
+  );
+}
+
+/** Small auto-resolved ERC-20 hint under an address input: symbol · decimals · balance. */
+function MetaHint({ addr, meta }: { addr: string; meta: Erc20Meta }) {
+  if (!isAddr(addr)) return null;
+  if (meta.isLoading) return <p className="text-xs text-neutral-500">resolving token…</p>;
+  if (!meta.isToken) return <p className="text-xs text-amber-400">Not a standard ERC-20 — decimals assumed 18.</p>;
+  const d = meta.decimals ?? 18;
+  return (
+    <p className="text-xs text-neutral-500">
+      {meta.symbol ?? "?"} {meta.name ? `(${meta.name}) ` : ""}· {d} dec
+      {meta.balance != null && ` · balance ${formatAmount(meta.balance, d, 4)}`}
+    </p>
   );
 }

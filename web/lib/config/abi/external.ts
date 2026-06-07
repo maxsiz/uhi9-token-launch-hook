@@ -32,9 +32,19 @@ export const Erc20Abi = [
     ],
     outputs: [{ type: "bool" }],
   },
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
 ] as const;
 
-/** Permit2 (IAllowanceTransfer) subset: read the nonce for the spender. */
+/** Permit2 (IAllowanceTransfer) subset: read the nonce + grant a spender allowance. */
 export const Permit2Abi = [
   {
     type: "function",
@@ -50,5 +60,102 @@ export const Permit2Abi = [
       { name: "expiration", type: "uint48" },
       { name: "nonce", type: "uint48" },
     ],
+  },
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const POOL_KEY_COMPONENTS = [
+  { name: "currency0", type: "address" },
+  { name: "currency1", type: "address" },
+  { name: "fee", type: "uint24" },
+  { name: "tickSpacing", type: "int24" },
+  { name: "hooks", type: "address" },
+] as const;
+
+/**
+ * V4Quoter subset: `quoteExactInputSingle` simulates a single-hop swap (runs the hook's beforeSwap, so
+ * it reverts on the same conditions a real swap would). It is not `view` — call it via
+ * `simulateContract` / `eth_call`, never as a normal read.
+ */
+export const V4QuoterAbi = [
+  {
+    type: "function",
+    name: "quoteExactInputSingle",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "poolKey", type: "tuple", components: POOL_KEY_COMPONENTS },
+          { name: "zeroForOne", type: "bool" },
+          { name: "exactAmount", type: "uint128" },
+          { name: "hookData", type: "bytes" },
+        ],
+      },
+    ],
+    outputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "gasEstimate", type: "uint256" },
+    ],
+  },
+] as const;
+
+/** ERC-721 subset: ownership read (PositionManager LP NFTs). */
+export const Erc721Abi = [
+  {
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+] as const;
+
+/** TokenFactory subset: deploy a fresh StandardToken clone (mints supply to `recipient`). */
+export const TokenFactoryAbi = [
+  {
+    type: "function",
+    name: "deployToken",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "cfg",
+        type: "tuple",
+        components: [
+          { name: "name", type: "string" },
+          { name: "symbol", type: "string" },
+          { name: "totalSupply", type: "uint256" },
+        ],
+      },
+      { name: "recipient", type: "address" },
+    ],
+    outputs: [{ name: "token", type: "address" }],
+  },
+] as const;
+
+/** UniversalRouter subset: the `execute(commands, inputs, deadline)` entry point. */
+export const UniversalRouterAbi = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [],
   },
 ] as const;
