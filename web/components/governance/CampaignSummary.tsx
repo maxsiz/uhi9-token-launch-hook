@@ -1,13 +1,15 @@
 "use client";
 
 import { useAccount } from "wagmi";
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 
 import { useCampaign } from "@/lib/campaign/useCampaign";
-import { type SupportedChainId } from "@/lib/config/chains";
+import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
+import { useErc20Meta } from "@/lib/useErc20Meta";
 import { formatAmount, formatUtc, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 
 const PHASES = ["Pre-launch", "Active", "Frozen"];
+const ZERO = "0x0000000000000000000000000000000000000000";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -15,6 +17,28 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span className="text-neutral-400">{label}</span>
       <span className="font-mono text-neutral-200">{children}</span>
     </div>
+  );
+}
+
+/** Truncated address linked to the chain's block explorer. */
+function AddrLink({ chainId, address, children }: { chainId: SupportedChainId; address: string; children?: React.ReactNode }) {
+  return (
+    <a href={`${EXPLORER[chainId]}/address/${address}`} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">
+      {children ?? truncateAddress(address)}
+    </a>
+  );
+}
+
+/** Token name/symbol (auto-resolved) + its address as an explorer link. Native ETH shows no link. */
+function TokenCell({ chainId, address }: { chainId: SupportedChainId; address: Address }) {
+  const native = address.toLowerCase() === ZERO;
+  const meta = useErc20Meta(chainId, native ? undefined : address);
+  if (native) return <span>ETH <span className="text-neutral-500">native</span></span>;
+  const label = meta.symbol ? `${meta.symbol}${meta.name ? ` · ${meta.name}` : ""}` : meta.isLoading ? "…" : "token";
+  return (
+    <span>
+      {label} <AddrLink chainId={chainId} address={address} />
+    </span>
   );
 }
 
@@ -39,13 +63,13 @@ export function CampaignSummary({ chainId, pid }: { chainId: SupportedChainId; p
       <h3 className="text-sm font-semibold">Campaign (via CampaignLens)</h3>
       <Row label="Phase">{PHASES[campaign.phase] ?? "?"}</Row>
       <Row label="Launch token">
-        {truncateAddress(campaign.tokenIsCurrency0 ? campaign.poolKey.currency0 : campaign.poolKey.currency1)}
+        <TokenCell chainId={chainId} address={campaign.tokenIsCurrency0 ? campaign.poolKey.currency0 : campaign.poolKey.currency1} />
       </Row>
       <Row label="Pair">
-        {truncateAddress(campaign.tokenIsCurrency0 ? campaign.poolKey.currency1 : campaign.poolKey.currency0)}
+        <TokenCell chainId={chainId} address={campaign.tokenIsCurrency0 ? campaign.poolKey.currency1 : campaign.poolKey.currency0} />
       </Row>
       <Row label="Gov NFT owner">
-        {truncateAddress(campaign.governanceOwner)}
+        <AddrLink chainId={chainId} address={campaign.governanceOwner} />
         {isOwner && <span className="ml-1 text-emerald-400">(you)</span>}
       </Row>
       <Row label="Modules">{enabledList}</Row>
