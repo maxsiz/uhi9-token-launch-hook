@@ -11,6 +11,7 @@ import { UNISWAP, PERMIT2 } from "@/lib/config/uniswap";
 import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
 import { formatAmount, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 import { quoteExactInputSingle } from "@/lib/swap/quote";
+import { decodeRevertReason } from "@/lib/swap/revertReason";
 import { buildUniversalRouterSwap } from "@/lib/swap/buildSwap";
 import {
   MAX_UINT160,
@@ -106,6 +107,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
           poolKey: campaign!.poolKey,
           zeroForOne: derived.zeroForOne,
           amountIn,
+          account: address, // simulate as the connected trader so tx.origin checks (whitelist) pass
         });
         if (!cancelled) {
           setAmountOut(out);
@@ -114,7 +116,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       } catch (e) {
         if (!cancelled) {
           setAmountOut(undefined);
-          setQuoteErr("Quote reverted — the swap would fail (whitelist phase, anti-snipe cap, or no liquidity).");
+          setQuoteErr(decodeRevertReason(e));
         }
       } finally {
         if (!cancelled) setQuoting(false);
@@ -124,7 +126,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       cancelled = true;
       clearTimeout(t);
     };
-  }, [client, derived, uni.quoter, amountIn, campaign]);
+  }, [client, derived, uni.quoter, amountIn, campaign, address]);
 
   // ── Whitelist gating (tx.origin subject) ──
   const whitelistActive = Boolean(
@@ -207,7 +209,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       setTxHash(hash);
       await Promise.all([allowanceReads.refetch?.(), wlRead.refetch?.()]);
     } catch (e: unknown) {
-      setActionErr(e instanceof Error ? e.message.split("\n")[0] : "Transaction failed");
+      setActionErr(decodeRevertReason(e));
     } finally {
       setBusy(false);
     }

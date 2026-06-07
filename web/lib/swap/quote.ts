@@ -14,6 +14,12 @@ export interface QuoteParams {
   poolKey: PoolKeyStruct;
   zeroForOne: boolean;
   amountIn: bigint;
+  /**
+   * The trader's address — passed as the eth_call `from`, so the hook's beforeSwap sees the real
+   * `tx.origin`. WITHOUT this the simulation runs as `0x0` and a whitelisted user still gets a
+   * `NotWhitelisted` revert. Always pass the connected account.
+   */
+  account?: Address;
 }
 
 /**
@@ -23,6 +29,7 @@ export interface QuoteParams {
  */
 export async function quoteExactInputSingle(client: PublicClient, p: QuoteParams): Promise<bigint> {
   const { result } = await client.simulateContract({
+    account: p.account,
     address: p.quoter,
     abi: V4QuoterAbi,
     functionName: "quoteExactInputSingle",

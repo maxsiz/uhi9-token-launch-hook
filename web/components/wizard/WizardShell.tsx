@@ -6,14 +6,17 @@ import { useAccount, useChainId } from "wagmi";
 import { parseUnits, type Address } from "viem";
 
 import { PRESETS, type PresetId } from "@/lib/campaign/presets";
-import type { EnabledMechanisms } from "@/lib/campaign/types";
+import { UnlockLogic, type EnabledMechanisms } from "@/lib/campaign/types";
 import { hookPlan } from "@/lib/hook/hookMap";
 import { HookExplainer } from "@/components/hook/HookExplainer";
 import { HookBadge } from "@/components/hook/HookBadge";
 import { isSupportedChain, EXPLORER, type SupportedChainId } from "@/lib/config/chains";
-import { prepareLaunch, type LaunchFormInput } from "@/lib/campaign/launch";
+import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "@/lib/campaign/launch";
 import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
 import { formatAmount, truncateAddress } from "@/lib/format";
+
+const num = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9]/g, "");
+const dec = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9.]/g, "");
 
 const STEPS = ["Token", "Pool & price", "Mechanisms", "Review", "Sign"] as const;
 type StepIndex = 0 | 1 | 2 | 3 | 4;
@@ -42,6 +45,37 @@ export function LaunchWizard() {
   const [seedToken, setSeedToken] = useState("100000");
   const [seedPair, setSeedPair] = useState("0.05");
   const [durationDays, setDurationDays] = useState("1");
+
+  // module config state (human units)
+  const [asDuration, setAsDuration] = useState("60"); // minutes
+  const [asMaxBuy, setAsMaxBuy] = useState("1"); // pair units
+  const [taxBuy, setTaxBuy] = useState("3");
+  const [taxSell, setTaxSell] = useState("5");
+  const [taxBase, setTaxBase] = useState("0.3");
+  const [taxDecay, setTaxDecay] = useState("7"); // days
+  const [lockLogic, setLockLogic] = useState<"AND" | "OR">("AND");
+  const [lockTime, setLockTime] = useState(true);
+  const [lockDelay, setLockDelay] = useState("1"); // days after launch ends
+  const [lockVolume, setLockVolume] = useState(false);
+  const [lockVolThreshold, setLockVolThreshold] = useState("0");
+  const [wlWindow, setWlWindow] = useState("30"); // minutes
+
+  const pairSym = pairMode === "native" ? "ETH" : "pair";
+  const modules: ModuleConfigInput = useMemo(
+    () => ({
+      antiSnipe: { durationMinutes: Number(asDuration) || 0, maxBuyHuman: asMaxBuy },
+      tax: { initialBuyPct: Number(taxBuy) || 0, initialSellPct: Number(taxSell) || 0, basePct: Number(taxBase) || 0, decayDays: Number(taxDecay) || 0 },
+      lock: {
+        logic: lockLogic === "OR" ? UnlockLogic.OR : UnlockLogic.AND,
+        timeEnabled: lockTime,
+        unlockDelayDays: Number(lockDelay) || 0,
+        volumeEnabled: lockVolume,
+        volumeThresholdHuman: lockVolThreshold,
+      },
+    }),
+    [asDuration, asMaxBuy, taxBuy, taxSell, taxBase, taxDecay, lockLogic, lockTime, lockDelay, lockVolume, lockVolThreshold]
+  );
+  const whitelistWindowMinutes = Number(wlWindow) || 30;
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
   const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
@@ -75,6 +109,8 @@ export function LaunchWizard() {
     seedPair,
     durationDays: Number(durationDays) || 1,
     enabled,
+    modules,
+    whitelistWindowMinutes,
   };
 
   // Best-effort preview (orientation for a fresh ERC-20-paired token is only exact post-deploy).
@@ -95,12 +131,15 @@ export function LaunchWizard() {
         slippageBps: 50,
         lpRecipient: (address ?? ZERO) as Address,
         enabled,
+        modules,
+        whitelistWindowMinutes,
       };
       return prepareLaunch(input, Math.floor(Date.now() / 1000));
     } catch {
       return undefined;
     }
-  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingDecimals, pairMode, pairAddress, pairDecimals, seedToken, seedPair, durationDays, address, enabled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenMode, name, symbol, form.totalSupply, existingToken, existingDecimals, pairMode, pairAddress, pairDecimals, seedToken, seedPair, durationDays, address, enabled, modules, whitelistWindowMinutes]);
 
   return (
     <div className="space-y-6">
@@ -178,11 +217,58 @@ export function LaunchWizard() {
           <div className="space-y-2">
             <h3 className="font-semibold">Mechanisms</h3>
             {FEATURES.map((k) => (
-              <label key={k} className="flex items-center gap-3 rounded-lg border border-neutral-800 p-3">
-                <input type="checkbox" checked={enabled[k]} onChange={() => toggle(k)} />
-                <span className="flex-1 capitalize">{k}</span>
-                <HookBadge feature={k} />
-              </label>
+              <div key={k} className="space-y-3 rounded-lg border border-neutral-800 p-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={enabled[k]} onChange={() => toggle(k)} />
+                  <span className="flex-1 capitalize">{k}</span>
+                  <HookBadge feature={k} />
+                </label>
+
+                {enabled.antiSnipe && k === "antiSnipe" && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Field label="Window (min, ≤ 1440)"><input className="input" value={asDuration} onChange={(e) => setAsDuration(num(e))} /></Field>
+                    <Field label={`Max buy / tx (${pairSym})`}><input className="input" value={asMaxBuy} onChange={(e) => setAsMaxBuy(dec(e))} /></Field>
+                  </div>
+                )}
+
+                {enabled.tax && k === "tax" && (
+                  <>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      <Field label="Buy %"><input className="input" value={taxBuy} onChange={(e) => setTaxBuy(dec(e))} /></Field>
+                      <Field label="Sell %"><input className="input" value={taxSell} onChange={(e) => setTaxSell(dec(e))} /></Field>
+                      <Field label="Base %"><input className="input" value={taxBase} onChange={(e) => setTaxBase(dec(e))} /></Field>
+                      <Field label="Decay (days)"><input className="input" value={taxDecay} onChange={(e) => setTaxDecay(dec(e))} /></Field>
+                    </div>
+                    {(Number(taxBase) > Number(taxBuy) || Number(taxBase) > Number(taxSell)) && (
+                      <p className="text-xs text-amber-400">Base % must be ≤ both initial taxes.</p>
+                    )}
+                    {(Number(taxBuy) > 10 || Number(taxSell) > 10) && <p className="text-xs text-amber-400">Max tax is 10%.</p>}
+                  </>
+                )}
+
+                {enabled.lock && k === "lock" && (
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-400">Logic</span>
+                      <button className={lockLogic === "AND" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("AND")}>AND</button>
+                      <button className={lockLogic === "OR" ? "btn-primary" : "btn-ghost"} onClick={() => setLockLogic("OR")}>OR</button>
+                    </div>
+                    <label className="flex flex-wrap items-center gap-2">
+                      <input type="checkbox" checked={lockTime} onChange={() => setLockTime((v) => !v)} /> Time — unlock
+                      <input className="input inline-block w-16" value={lockDelay} onChange={(e) => setLockDelay(num(e))} /> day(s) after launch ends
+                    </label>
+                    <label className="flex flex-wrap items-center gap-2">
+                      <input type="checkbox" checked={lockVolume} onChange={() => setLockVolume((v) => !v)} /> Volume — threshold
+                      <input className="input inline-block w-28" value={lockVolThreshold} onChange={(e) => setLockVolThreshold(dec(e))} /> {pairSym}
+                    </label>
+                    {!lockTime && !lockVolume && <p className="text-xs text-amber-400">Keep at least one condition.</p>}
+                  </div>
+                )}
+
+                {enabled.whitelist && k === "whitelist" && (
+                  <Field label="Whitelist window (min, within launch)"><input className="input" value={wlWindow} onChange={(e) => setWlWindow(num(e))} /></Field>
+                )}
+              </div>
             ))}
           </div>
           <div className="card">
@@ -255,5 +341,14 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <span className="text-neutral-400">{label}</span>
       <span className="font-mono text-neutral-200">{children}</span>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs text-neutral-400">{label}</span>
+      {children}
+    </label>
   );
 }

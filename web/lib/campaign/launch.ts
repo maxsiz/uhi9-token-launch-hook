@@ -40,6 +40,14 @@ export interface LaunchFormInput {
   // mechanisms
   enabled: EnabledMechanisms;
   whitelistWindowMinutes?: number; // when whitelist enabled
+  modules?: ModuleConfigInput; // per-module tunables; falls back to defaults when absent
+}
+
+/** Human-unit module configs from the wizard (mapped to contract structs in prepareLaunch). */
+export interface ModuleConfigInput {
+  antiSnipe?: { durationMinutes: number; maxBuyHuman: string };
+  tax?: { initialBuyPct: number; initialSellPct: number; basePct: number; decayDays: number };
+  lock?: { logic: UnlockLogic; timeEnabled: boolean; unlockDelayDays: number; volumeEnabled: boolean; volumeThresholdHuman: string };
 }
 
 export interface PreparedLaunch {
@@ -81,6 +89,41 @@ export function prepareLaunch(input: LaunchFormInput, nowSec: number): PreparedL
   const launchDurationSeconds = BigInt(Math.max(1, input.launchDurationDays)) * DAY;
   const launchEnd = BigInt(nowSec) + launchDurationSeconds;
   const en = input.enabled;
+  const m = input.modules;
+
+  // ── Anti-snipe (M1) ──
+  const aCfg = m?.antiSnipe;
+  const antiSnipe = {
+    antiSnipeDuration: en.antiSnipe ? (aCfg ? Math.round(aCfg.durationMinutes * 60) : 3600) : 0,
+    maxBuyAmountIn: en.antiSnipe && aCfg ? parseUnits(aCfg.maxBuyHuman || "0", pairDecimals) : amount1 / 50n,
+  };
+
+  // ── Tax (M2) ──
+  const tCfg = m?.tax;
+  const tax = en.tax
+    ? tCfg
+      ? {
+          initialBuyTax: percentToTaxUnits(tCfg.initialBuyPct),
+          initialSellTax: percentToTaxUnits(tCfg.initialSellPct),
+          baseTax: percentToTaxUnits(tCfg.basePct),
+          decayDuration: Math.round(tCfg.decayDays * 86_400),
+        }
+      : { initialBuyTax: percentToTaxUnits(3), initialSellTax: percentToTaxUnits(5), baseTax: percentToTaxUnits(0.3), decayDuration: Number(7n * DAY) }
+    : { initialBuyTax: 0, initialSellTax: 0, baseTax: 0, decayDuration: 0 };
+
+  // ── Liquidity lock (M3) ── keep ≥1 condition; unlockTime ≥ launchEnd (+1h buffer for mining delay).
+  const lCfg = m?.lock;
+  let timeEnabled = en.lock ? (lCfg ? lCfg.timeEnabled : true) : false;
+  const volumeEnabled = en.lock && lCfg ? lCfg.volumeEnabled : false;
+  if (en.lock && !timeEnabled && !volumeEnabled) timeEnabled = true;
+  const delaySec = lCfg ? Math.max(3600, Math.round(lCfg.unlockDelayDays * 86_400)) : Number(DAY);
+  const lock = {
+    logic: lCfg ? lCfg.logic : UnlockLogic.AND,
+    timeEnabled,
+    volumeEnabled,
+    unlockTime: launchEnd + BigInt(delaySec),
+    unlockVolumeThreshold: en.lock && volumeEnabled && lCfg ? parseUnits(lCfg.volumeThresholdHuman || "0", pairDecimals) : 0n,
+  };
 
   const params = buildCampaignParams({
     existingToken: existingToken === ZERO ? undefined : existingToken,
@@ -91,21 +134,10 @@ export function prepareLaunch(input: LaunchFormInput, nowSec: number): PreparedL
     lpRecipient: input.lpRecipient,
     launchDurationSeconds,
     enabled: en,
-    // Per-module defaults (only consumed when the matching flag is set).
-    antiSnipe: { antiSnipeDuration: en.antiSnipe ? 3600 : 0, maxBuyAmountIn: amount1 / 50n },
-    tax: en.tax
-      ? { initialBuyTax: percentToTaxUnits(3), initialSellTax: percentToTaxUnits(5), baseTax: percentToTaxUnits(0.3), decayDuration: Number(7n * DAY) }
-      : { initialBuyTax: 0, initialSellTax: 0, baseTax: 0, decayDuration: 0 },
-    lock: {
-      logic: UnlockLogic.AND,
-      timeEnabled: en.lock,
-      volumeEnabled: false,
-      unlockTime: launchEnd + DAY, // ≥ launchEndTime with a safety buffer for mining delay
-      unlockVolumeThreshold: 0n,
-    },
-    whitelist: {
-      whitelistEndTime: BigInt(nowSec + (input.whitelistWindowMinutes ?? 30) * 60),
-    },
+    antiSnipe,
+    tax,
+    lock,
+    whitelist: { whitelistEndTime: BigInt(nowSec + (input.whitelistWindowMinutes ?? 30) * 60) },
     mint,
   });
 
