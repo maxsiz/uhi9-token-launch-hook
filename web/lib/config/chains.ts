@@ -37,7 +37,14 @@ const ENV_RPC: Record<SupportedChainId, string | undefined> = {
  * should stay off the client — set the matching server-only `RPC_URL_<id>` to enable it. The proxy
  * returns 501 when unconfigured, so viem's `fallback` simply moves on to env/public URLs.
  */
+// Same-origin proxy as the PRIMARY transport for every chain: set a server-only RPC_URL_<id> in the
+// deploy env to route that chain's reads through /api/rpc (no browser CORS, paid key stays server-side,
+// reliable eth_getLogs for NFT discovery). When RPC_URL_<id> is unset the proxy returns 501 and viem's
+// fallback drops to the public RPC below.
 const PROXY_RPC: Partial<Record<SupportedChainId, string>> = {
+  [mainnet.id]: "/api/rpc?chainId=1",
+  [base.id]: "/api/rpc?chainId=8453",
+  [arbitrum.id]: "/api/rpc?chainId=42161",
   [unichain.id]: "/api/rpc?chainId=130",
   [unichainSepolia.id]: "/api/rpc?chainId=1301",
 };
