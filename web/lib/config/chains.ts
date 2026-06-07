@@ -1,8 +1,12 @@
 import { mainnet, base, arbitrum, unichain, unichainSepolia } from "wagmi/chains";
 import { http, fallback, type Transport } from "viem";
 
-/** Chains the launch stack is deployed on (must match HookDeployLib.canonical). */
-export const SUPPORTED_CHAINS = [mainnet, base, arbitrum, unichain, unichainSepolia] as const;
+/**
+ * Chains the launch stack is deployed on (must match HookDeployLib.canonical). Order matters: the
+ * first entry is wagmi's default chain when no wallet is connected — Unichain Sepolia (the only chain
+ * with contracts today) leads so the app defaults to a live network and heads the selector list.
+ */
+export const SUPPORTED_CHAINS = [unichainSepolia, mainnet, base, arbitrum, unichain] as const;
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
 export const SUPPORTED_CHAIN_IDS = SUPPORTED_CHAINS.map((c) => c.id) as SupportedChainId[];
