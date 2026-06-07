@@ -93,16 +93,21 @@ One more thing we cared about: legibility. Every button in the app is badged wit
 
 ---
 
-## Status
+## Status — and it's all on-chain
 
-- ✅ **135 passing tests** — unit, fuzz, and **mainnet-fork**
-- 🚀 Live on **Ethereum**, **Unichain**, **Unichain Sepolia**
-- 🌐 Full web studio on Vercel — launch · govern · trade
+- ✅ **135 passing tests** — unit, fuzz, **mainnet-fork**
+- 🚀 Live on **Ethereum**, **Unichain**, **Unichain Sepolia** · studio on Vercel
 
-<p class="subtitle">Let me prove it: green tests, then a live launch.</p>
+**Proof, not slides:**
+
+**Atomic launch** — [sepolia.uniscan.xyz · 0x0d02…fab5d ↗](https://sepolia.uniscan.xyz/tx/0x0d026ce58f40be357055c0f997ed87cb6cf82b6ce85d2ad04093be72302fab5d)
+<br><span class="muted">one tx — pool init + seed mint + governance NFT captured + mechanisms armed</span>
+
+**Governance** — [sepolia.uniscan.xyz · 0xc9b1…5b94ac ↗](https://sepolia.uniscan.xyz/tx/0xc9b1bcbc160f58705d6361b559aab69982b3110115ba20df03c318dbbc5b94ac)
+<br><span class="muted">whitelist update — authorized only by holding the LP-NFT · no admin key</span>
 
 Note:
-It's real. 135 tests pass, including fuzz tests on the tax-decay math and fork tests against live Uniswap v4. It's deployed on three chains including Ethereum mainnet, with a full studio on Vercel. Let me show you the tests, then launch a token live.
+And this isn't mockups. 135 tests pass — including fuzz tests on the tax-decay math and fork tests against live Uniswap v4. It's live on three chains including Ethereum mainnet. Here are two real, public transactions: the atomic launch — one transaction that initializes the pool, mints the seed liquidity, and captures the governance NFT — and a governance action, authorized purely by holding that NFT. Verify them yourself. Now let me prove it live: tests, then a launch.
 
 ---
 

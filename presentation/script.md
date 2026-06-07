@@ -38,12 +38,17 @@ Under the hood: three small contracts, deployed once per chain. One mined hook a
 launch, and a launch is a single atomic transaction. And it's transparent — the studio badges every
 action with the exact hook callback it triggers, and traces what the hook did after each transaction.
 
+**[02:08 · Slide 8 — Status & on-chain proof]**
+And this is real. It's live on three chains, including Ethereum mainnet. These two links are actual
+public transactions: the atomic launch — pool, liquidity, and governance NFT in *one* tx — and a
+governance action authorized only by holding that NFT. Verify them yourself.
+
 ---
 
 ## ACT 2 — Green tests · ~0:45  `[switch to terminal]`
 
-**[02:10 · Slide 8 → terminal]**
-First, does it work? `[run: forge test -vvv]`
+**[02:20 · Slide 8 → terminal]**
+But does it hold up? `[run: forge test -vvv]`
 
 **[02:18]**
 This is the full suite — **135 tests, all green.** Unit tests for each mechanism, **fuzz tests** that
