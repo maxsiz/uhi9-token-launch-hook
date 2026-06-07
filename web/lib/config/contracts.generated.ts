@@ -23,3 +23,12 @@ export const CONTRACTS: Record<SupportedChainId, StackAddresses> = {
 export function isDeployed(chainId: SupportedChainId): boolean {
   return CONTRACTS[chainId].wrapper !== ZERO;
 }
+
+/** Stack deploy block per chain — lower bound for log-based position discovery (0 if not deployed). */
+export const DEPLOY_BLOCK: Record<SupportedChainId, bigint> = {
+  [mainnet.id]: 0n,
+  [base.id]: 0n,
+  [arbitrum.id]: 0n,
+  [unichain.id]: 0n,
+  [unichainSepolia.id]: 53872706n,
+};

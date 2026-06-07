@@ -112,6 +112,17 @@ export const V4QuoterAbi = [
   },
 ] as const;
 
+/** ERC-721 subset: ownership read (PositionManager LP NFTs). */
+export const Erc721Abi = [
+  {
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ type: "address" }],
+  },
+] as const;
+
 /** TokenFactory subset: deploy a fresh StandardToken clone (mints supply to `recipient`). */
 export const TokenFactoryAbi = [
   {

@@ -9,6 +9,7 @@ import { isSupportedChain } from "@/lib/config/chains";
 import { HookActivityPanel } from "@/components/hook/HookActivityPanel";
 import { CampaignSummary } from "@/components/governance/CampaignSummary";
 import { GovernanceActions } from "@/components/governance/GovernanceActions";
+import { WalletCampaignPicker } from "@/components/governance/WalletCampaignPicker";
 
 export function GovernanceDashboard() {
   const chainId = useChainId();
@@ -24,6 +25,10 @@ export function GovernanceDashboard() {
           The stack isn&apos;t deployed on this chain yet (run <code className="font-mono">DeployStack.s.sol</code>{" "}
           then <code className="font-mono">npm run gen:contracts</code>).
         </div>
+      )}
+
+      {deployed && isSupportedChain(chainId) && (
+        <WalletCampaignPicker chainId={chainId} selected={pid} onSelect={setPid} />
       )}
 
       <div className="card space-y-2">
