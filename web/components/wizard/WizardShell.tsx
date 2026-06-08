@@ -108,6 +108,27 @@ export function LaunchWizard() {
   const seedTokenOver = seedTokenAvail != null && toWeiSafe(seedToken, seedTokenDecimals) > seedTokenAvail;
   const seedPairOver = seedPairAvail != null && toWeiSafe(seedPair, seedPairDecimals) > seedPairAvail;
 
+  // What this launch will actually do — shown upfront so multiple wallet prompts aren't a surprise.
+  // Native-ETH + fresh token is one tx (the wrapper deploys the token in the same call); an ERC-20 pair
+  // with a fresh token needs a separate deploy tx first (the price depends on the token's address).
+  const launchSteps: { kind: "tx" | "sign"; label: string }[] = (() => {
+    const freshErc20 = tokenMode === "new" && pairMode === "erc20";
+    const steps: { kind: "tx" | "sign"; label: string }[] = [];
+    if (freshErc20) steps.push({ kind: "tx", label: `Deploy ${tokenSym} (separate tx — required to price an ERC-20 pair)` });
+    const pulled: string[] = [];
+    if (tokenMode === "existing" || freshErc20) pulled.push(tokenSym);
+    if (pairMode === "erc20") pulled.push(pairSym);
+    if (pulled.length) {
+      steps.push({ kind: "tx", label: `Approve ${pulled.join(" & ")} for Permit2 (one-time — skipped if already approved)` });
+      steps.push({ kind: "sign", label: "Sign the Permit2 approval (gasless)" });
+    }
+    steps.push({
+      kind: "tx",
+      label: tokenMode === "new" && pairMode === "native" ? "Launch — your token is deployed in the same transaction" : "Launch campaign",
+    });
+    return steps;
+  })();
+
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
   const { run, stage, error, result, pendingHash } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
 
@@ -390,10 +411,24 @@ export function LaunchWizard() {
             </div>
           ) : (
             <>
-              <p className="text-neutral-400">
-                Deploys the token (if new + ERC-20 pair), signs Permit2 (if pulling ERC-20s), then
-                <code className="mx-1 font-mono">simulate → launchCampaign</code>. Fresh token + native ETH needs no Permit2.
-              </p>
+              <div className="rounded-lg border border-neutral-800 p-3">
+                <p className="mb-2 text-xs font-semibold text-neutral-300">Transaction plan</p>
+                <ol className="space-y-1">
+                  {launchSteps.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-neutral-400">
+                      <span className={`mt-0.5 shrink-0 rounded px-1 font-mono text-[10px] ${s.kind === "sign" ? "bg-blue-500/15 text-blue-300" : "bg-neutral-700/50 text-neutral-300"}`}>
+                        {s.kind === "sign" ? "sign" : "tx"}
+                      </span>
+                      <span>
+                        {i + 1}. {s.label}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-[11px] text-neutral-600">
+                  Each <span className="font-mono">tx</span> needs a wallet confirmation; <span className="font-mono">sign</span> is a gasless signature.
+                </p>
+              </div>
               <button className="btn-primary flex items-center gap-2" disabled={!supported || !!stage || seedTokenOver || seedPairOver} onClick={() => run(form)}>
                 {stage && <Spinner className="h-4 w-4" />}
                 {stage ?? "Launch campaign"}
