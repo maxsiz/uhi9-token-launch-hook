@@ -24,6 +24,15 @@ const CHAINS: { id: number; key: string }[] = [
 const WANT = ["TokenLaunchHook", "CampaignWrapper", "TokenFactory", "CampaignLens"] as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
 
+// Standalone DeployWrapper redeploys (the auto-priced launchCampaign overload), pointing at the existing
+// hook/factory. Verified on-chain 2026-06-08 (codesize 12389 == task_020 wrapper; HOOK()/TOKEN_FACTORY()
+// match each chain). Used when the DeployWrapper broadcast isn't committed; a committed broadcast wins.
+const WRAPPER_OVERRIDE: Record<number, string> = {
+  1: "0x205549bcb010d429354aabc2cae057b090bcf5b8",
+  130: "0xcc20f7c7763ef77703a552e75e27ceaea99dc8cb",
+  1301: "0x0ae47666b31fe6e684c381cbea7a80748682d575",
+};
+
 function readBroadcast(chainId: number): { found: Record<string, string>; deployBlock: bigint } {
   const file = join(REPO_ROOT, "broadcast", "DeployStack.s.sol", String(chainId), "run-latest.json");
   const found: Record<string, string> = {};
@@ -40,14 +49,19 @@ function readBroadcast(chainId: number): { found: Record<string, string>; deploy
   // A standalone DeployWrapper run (a new CampaignWrapper bound to the existing hook/factory — e.g. to
   // ship the auto-priced overload) overrides just the wrapper address; the rest of the stack is unchanged.
   const wf = join(REPO_ROOT, "broadcast", "DeployWrapper.s.sol", String(chainId), "run-latest.json");
+  let overridden = false;
   if (existsSync(wf)) {
     const wj = JSON.parse(readFileSync(wf, "utf8"));
     if (Array.isArray(wj.receipts) && wj.receipts.length > 0) {
       for (const tx of wj.transactions ?? []) {
-        if (tx.contractName === "CampaignWrapper" && tx.contractAddress) found.CampaignWrapper = tx.contractAddress;
+        if (tx.contractName === "CampaignWrapper" && tx.contractAddress) {
+          found.CampaignWrapper = tx.contractAddress;
+          overridden = true;
+        }
       }
     }
   }
+  if (!overridden && WRAPPER_OVERRIDE[chainId] && found.CampaignWrapper) found.CampaignWrapper = WRAPPER_OVERRIDE[chainId];
   // Earliest receipt block — lower bound for log discovery scans.
   const blocks = json.receipts.map((r: { blockNumber?: string }) => (r.blockNumber ? BigInt(r.blockNumber) : 0n)).filter((b: bigint) => b > 0n);
   const deployBlock = blocks.length ? blocks.reduce((m: bigint, b: bigint) => (b < m ? b : m)) : 0n;

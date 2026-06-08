@@ -13,11 +13,11 @@ export interface StackAddresses {
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 export const CONTRACTS: Record<SupportedChainId, StackAddresses> = {
-  [mainnet.id]: { hook: "0x0b93309f6b6e404769de885dac66cb357ad30ac0", wrapper: "0x8a56c6be755ac385395e96234b553db1b9b06bea", factory: "0xa373fbacd0964fcb7bc01cb447a2f25f11e8995b", lens: "0xf8da8dc6d8cdcadcc96b51d5fc0cb59ef3672005" },
+  [mainnet.id]: { hook: "0x0b93309f6b6e404769de885dac66cb357ad30ac0", wrapper: "0x205549bcb010d429354aabc2cae057b090bcf5b8", factory: "0xa373fbacd0964fcb7bc01cb447a2f25f11e8995b", lens: "0xf8da8dc6d8cdcadcc96b51d5fc0cb59ef3672005" },
   [base.id]: { hook: "0x0000000000000000000000000000000000000000", wrapper: "0x0000000000000000000000000000000000000000", factory: "0x0000000000000000000000000000000000000000", lens: "0x0000000000000000000000000000000000000000" },
   [arbitrum.id]: { hook: "0x0000000000000000000000000000000000000000", wrapper: "0x0000000000000000000000000000000000000000", factory: "0x0000000000000000000000000000000000000000", lens: "0x0000000000000000000000000000000000000000" },
-  [unichain.id]: { hook: "0xd5ca99907f2db792dcd4865e7d12df5f71874ac0", wrapper: "0x4f85ffb544c0de49a231408157c5b8dab4a55a1c", factory: "0x653bce4d7a6cf5c4fdbbd5fc6b2bb41c8eafc56a", lens: "0x22bbbe241464ab67c9b4f0881fa45f7f2d26870f" },
-  [unichainSepolia.id]: { hook: "0x79880abb0c03233e40b87452e7a45abd96ab0ac0", wrapper: "0x6f8679bba6c01c82b5809f2fd6767ddbde53657b", factory: "0x41cb3079a635bc11183c188281b8db14e4c57f9a", lens: "0x5a94af1fad259528c8825f254c3d1f85e7896e9e" },
+  [unichain.id]: { hook: "0xd5ca99907f2db792dcd4865e7d12df5f71874ac0", wrapper: "0xcc20f7c7763ef77703a552e75e27ceaea99dc8cb", factory: "0x653bce4d7a6cf5c4fdbbd5fc6b2bb41c8eafc56a", lens: "0x22bbbe241464ab67c9b4f0881fa45f7f2d26870f" },
+  [unichainSepolia.id]: { hook: "0x79880abb0c03233e40b87452e7a45abd96ab0ac0", wrapper: "0x0ae47666b31fe6e684c381cbea7a80748682d575", factory: "0x41cb3079a635bc11183c188281b8db14e4c57f9a", lens: "0x5a94af1fad259528c8825f254c3d1f85e7896e9e" },
 };
 
 export function isDeployed(chainId: SupportedChainId): boolean {
