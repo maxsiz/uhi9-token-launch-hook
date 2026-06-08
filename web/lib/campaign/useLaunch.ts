@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
-import { maxUint256, parseEventLogs, type Address, type Hex } from "viem";
+import { formatUnits, maxUint256, parseEventLogs, type Address, type Hex } from "viem";
 
 import { CampaignWrapperAbi, Erc20Abi, Permit2Abi, TokenFactoryAbi } from "@/lib/config/abi";
 import { CONTRACTS } from "@/lib/config/contracts.generated";
@@ -103,11 +103,34 @@ export function useLaunch(chainId: SupportedChainId) {
 
     const prepared = prepareLaunch(input, Math.floor(Date.now() / 1000));
 
-    // 2) Permit2 allowance for each ERC-20 side: token → Permit2, then Permit2 → wrapper (direct, no
+    // 2) Pre-flight: make sure the deployer actually holds the seed amounts BEFORE sending any
+    //    approvals, so a doomed launch fails fast with a clear reason instead of an undecodable
+    //    launchCampaign simulate revert (the wrapper pulls the token via Permit2.transferFrom).
+    setStage("Checking balances");
+    for (const t of prepared.permitTokens) {
+      const bal = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "balanceOf", args: [address] })) as bigint;
+      if (bal < t.amount) {
+        const dec = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "decimals" }).catch(() => 18)) as number;
+        const sym = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "symbol" }).catch(() => t.token.slice(0, 8))) as string;
+        throw new Error(`Insufficient ${sym}: need ${formatUnits(t.amount, dec)}, have ${formatUnits(bal, dec)}`);
+      }
+    }
+    if (prepared.value > 0n) {
+      const ethBal = await client.getBalance({ address });
+      if (ethBal < prepared.value) {
+        throw new Error(`Insufficient ETH: need ${formatUnits(prepared.value, 18)} (plus gas), have ${formatUnits(ethBal, 18)}`);
+      }
+    }
+
+    // 3) Permit2 allowance for each ERC-20 side: token → Permit2, then Permit2 → wrapper (direct, no
     //    signature). The wrapper pulls via Permit2.transferFrom, so permitData stays "0x".
-    const expiration = Math.floor(Date.now() / 1000) + PERMIT2_EXPIRATION_SECS;
+    const now = Math.floor(Date.now() / 1000);
+    const expiration = now + PERMIT2_EXPIRATION_SECS;
     for (const t of prepared.permitTokens) {
       await approvePermit2IfNeeded(t.token, t.amount);
+      // Skip the Permit2 → wrapper approve when a sufficient, unexpired allowance already exists.
+      const [allowed, exp] = (await client.readContract({ address: PERMIT2, abi: Permit2Abi, functionName: "allowance", args: [address, t.token, wrapper] })) as [bigint, number, number];
+      if (allowed >= t.amount && exp > now + 300) continue;
       setStage(`Enabling ${t.token.slice(0, 8)}… on the launcher`);
       const { request } = await client.simulateContract({ account: address, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
       const gh = await writeContractAsync(request);

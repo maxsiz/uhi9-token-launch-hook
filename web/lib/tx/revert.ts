@@ -43,7 +43,12 @@ export function decodeContractError(err: unknown, fallback = "Transaction would 
     const m = err.message.toLowerCase();
     if (m.includes("user rejected") || m.includes("user denied")) return "Transaction rejected in the wallet.";
     if (m.includes("insufficient funds")) return "Insufficient funds for the transaction (value + gas).";
-    return err.shortMessage || fallback;
+    // Wrapped pull failures (Permit2 / token transferFrom) — these bubble up from inside the wrapper's
+    // multicall, so viem can't name them; scan the raw text.
+    if (m.includes("transfer_from_failed") || m.includes("transferfrom failed")) return "Token transfer failed — check the token balance and Permit2 approval.";
+    if (m.includes("transfer amount exceeds balance") || m.includes("exceeds balance")) return "Token transfer exceeds your balance — lower the seed amount.";
+    if (m.includes("allowanceexpired") || m.includes("insufficientallowance")) return "Permit2 allowance is insufficient or expired — re-approve and retry.";
+    return err.shortMessage || err.message.split("\n")[0] || fallback;
   }
-  return err instanceof Error ? err.message.split("\n")[0] : fallback;
+  return (err instanceof Error && err.message.split("\n")[0]) || fallback;
 }

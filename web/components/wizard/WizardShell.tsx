@@ -392,9 +392,12 @@ export function LaunchWizard() {
                 Deploys the token (if new + ERC-20 pair), signs Permit2 (if pulling ERC-20s), then
                 <code className="mx-1 font-mono">simulate → launchCampaign</code>. Fresh token + native ETH needs no Permit2.
               </p>
-              <button className="btn-primary" disabled={!supported || !!stage} onClick={() => run(form)}>
+              <button className="btn-primary" disabled={!supported || !!stage || seedTokenOver || seedPairOver} onClick={() => run(form)}>
                 {stage ?? "Launch campaign"}
               </button>
+              {(seedTokenOver || seedPairOver) && (
+                <p className="text-xs text-red-400">Seed amount exceeds your balance — adjust it on the Pool &amp; price step.</p>
+              )}
               {error && <p className="text-xs text-red-400">{error}</p>}
             </>
           )}
