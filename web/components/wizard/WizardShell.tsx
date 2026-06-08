@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useBalance, useChainId } from "wagmi";
 import { parseUnits, type Address } from "viem";
 
 import { PRESETS, type PresetId } from "@/lib/campaign/presets";
@@ -81,12 +81,30 @@ export function LaunchWizard() {
   const pairMeta = useErc20Meta(chainId, pairMode === "erc20" && isAddr(pairAddress) ? (pairAddress as Address) : undefined);
   const existingDecimals = existingMeta.decimals ?? 18;
   const pairDecimals = pairMeta.decimals ?? 18;
+  // Connected wallet's native (ETH) balance — used when seeding against a native-ETH pair.
+  const nativeBalance = useBalance({ address, chainId, query: { enabled: pairMode === "native" && !!address } });
 
   const pairSym = pairMode === "native" ? "ETH" : pairMeta.symbol ?? "pair";
   const tokenSym = tokenMode === "new" ? symbol || "token" : existingMeta.symbol ?? "token";
   // Initial price from the seed ratio (pair currency per 1 token), and its reverse.
   const pairPerToken = Number(seedPair) / Number(seedToken);
   const tokenPerPair = Number(seedToken) / Number(seedPair);
+
+  // Seed-vs-available: warn when seeding more than you hold. Token side: new ⇒ minted supply, existing ⇒
+  // wallet balance. Pair side: native ⇒ ETH balance, ERC-20 ⇒ wallet balance. undefined ⇒ hide the line.
+  const toWeiSafe = (v: string, d: number) => {
+    try {
+      return parseUnits(v || "0", d);
+    } catch {
+      return 0n;
+    }
+  };
+  const seedTokenDecimals = tokenMode === "new" ? 18 : existingDecimals;
+  const seedPairDecimals = pairMode === "native" ? 18 : pairDecimals;
+  const seedTokenAvail = tokenMode === "new" ? toWeiSafe(supplyStr, 18) : existingMeta.balance;
+  const seedPairAvail = pairMode === "native" ? nativeBalance.data?.value : pairMeta.balance;
+  const seedTokenOver = seedTokenAvail != null && toWeiSafe(seedToken, seedTokenDecimals) > seedTokenAvail;
+  const seedPairOver = seedPairAvail != null && toWeiSafe(seedPair, seedPairDecimals) > seedPairAvail;
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
   const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
@@ -205,10 +223,22 @@ export function LaunchWizard() {
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Seed token amount" hint="How many of your tokens seed the pool. With the pair amount it sets the starting price.">
-              <input className="input" value={seedToken} onChange={(e) => setSeedToken(e.target.value.replace(/[^0-9.]/g, ""))} />
+              <input className={`input ${seedTokenOver ? "ring-1 ring-red-500" : ""}`} value={seedToken} onChange={(e) => setSeedToken(dec(e))} />
+              {seedTokenAvail != null && (
+                <span className={`block text-xs ${seedTokenOver ? "text-red-400" : "text-neutral-500"}`}>
+                  {tokenMode === "new" ? "Supply" : "Balance"}: {formatAmount(seedTokenAvail, seedTokenDecimals, 4)} {tokenSym}
+                  {seedTokenOver && ` — exceeds ${tokenMode === "new" ? "total supply" : "your balance"}`}
+                </span>
+              )}
             </Field>
             <Field label={`Seed pair amount (${pairMode === "native" ? "ETH" : "pair"})`} hint={`${pairMode === "native" ? "ETH" : "Pair currency"} that seeds the pool. Starting price ≈ pair ÷ token.`}>
-              <input className="input" value={seedPair} onChange={(e) => setSeedPair(e.target.value.replace(/[^0-9.]/g, ""))} />
+              <input className={`input ${seedPairOver ? "ring-1 ring-red-500" : ""}`} value={seedPair} onChange={(e) => setSeedPair(dec(e))} />
+              {seedPairAvail != null && (
+                <span className={`block text-xs ${seedPairOver ? "text-red-400" : "text-neutral-500"}`}>
+                  Balance: {formatAmount(seedPairAvail, seedPairDecimals, 4)} {pairSym}
+                  {seedPairOver && " — exceeds your balance"}
+                </span>
+              )}
             </Field>
           </div>
           <Field label="Launch duration (days, ≥ 1)" hint="How long fair-launch rules stay enforceable (1–365 d). Governance can only relax params during this Active window; after it everything freezes.">
