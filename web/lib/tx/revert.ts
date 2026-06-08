@@ -48,6 +48,13 @@ export function decodeContractError(err: unknown, fallback = "Transaction would 
     if (m.includes("transfer_from_failed") || m.includes("transferfrom failed")) return "Token transfer failed — check the token balance and Permit2 approval.";
     if (m.includes("transfer amount exceeds balance") || m.includes("exceeds balance")) return "Token transfer exceeds your balance — lower the seed amount.";
     if (m.includes("allowanceexpired") || m.includes("insufficientallowance")) return "Permit2 allowance is insufficient or expired — re-approve and retry.";
+    // Permit2 custom errors (wrapped inside launchCampaign — viem can't name them; scan selectors).
+    if (m.includes("756688fe")) return "Permit2: invalid nonce — refresh the page and retry the signature.";
+    if (m.includes("cd21db4f")) return "Permit2: the signature expired — sign again.";
+    if (m.includes("d81b2f2e")) return "Permit2: the allowance expired — sign again.";
+    if (m.includes("815e1d64")) return "Permit2: invalid signer — reconnect the wallet and retry.";
+    if (m.includes("24d35a26")) return "Permit2: nonce already used — refresh and retry.";
+    if (m.includes("ff633a38")) return "Permit2: malformed permit data (length mismatch).";
     return err.shortMessage || err.message.split("\n")[0] || fallback;
   }
   return (err instanceof Error && err.message.split("\n")[0]) || fallback;

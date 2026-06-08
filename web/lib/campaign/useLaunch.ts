@@ -1,19 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useSignTypedData, useWriteContract } from "wagmi";
 import { formatUnits, maxUint256, parseEventLogs, type Address, type Hex } from "viem";
 
-import { CampaignWrapperAbi, Erc20Abi, Permit2Abi, TokenFactoryAbi } from "@/lib/config/abi";
+import { CampaignWrapperAbi, Erc20Abi, TokenFactoryAbi } from "@/lib/config/abi";
 import { CONTRACTS } from "@/lib/config/contracts.generated";
 import { PERMIT2 } from "@/lib/config/uniswap";
 import { type SupportedChainId } from "@/lib/config/chains";
 import { decodeContractError } from "@/lib/tx/revert";
+import { buildPermitData } from "./permit2";
 import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "./launch";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
-const MAX_UINT160 = (1n << 160n) - 1n;
-const PERMIT2_EXPIRATION_SECS = 60 * 60 * 24 * 30;
 
 export interface WizardForm {
   tokenMode: "new" | "existing";
@@ -37,6 +36,7 @@ export function useLaunch(chainId: SupportedChainId) {
   const { address } = useAccount();
   const client = usePublicClient({ chainId });
   const { writeContractAsync } = useWriteContract();
+  const { signTypedDataAsync } = useSignTypedData();
   const [stage, setStage] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<{ pid: Hex; hash: Hex } | undefined>();
@@ -131,28 +131,34 @@ export function useLaunch(chainId: SupportedChainId) {
       }
     }
 
-    // 3) Permit2 allowance for each ERC-20 side: token → Permit2, then Permit2 → wrapper (direct, no
-    //    signature). The wrapper pulls via Permit2.transferFrom, so permitData stays "0x".
-    const now = Math.floor(Date.now() / 1000);
-    const expiration = now + PERMIT2_EXPIRATION_SECS;
+    // 3) Permit2: token → Permit2 (on-chain ERC-20 approve, once per token), then Permit2 → wrapper via a
+    //    single gasless batch SIGNATURE folded into the launch tx (permitData), instead of N on-chain
+    //    Permit2.approve transactions. The wrapper calls PERMIT2.permit(msg.sender, batch, signature).
+    let permitData: Hex = "0x";
     for (const t of prepared.permitTokens) {
       await approvePermit2IfNeeded(t.token, t.amount);
-      // Skip the Permit2 → wrapper approve when a sufficient, unexpired allowance already exists.
-      const [allowed, exp] = (await client.readContract({ address: PERMIT2, abi: Permit2Abi, functionName: "allowance", args: [address, t.token, wrapper] })) as [bigint, number, number];
-      if (allowed >= t.amount && exp > now + 300) continue;
-      setStage(`Enabling ${t.token.slice(0, 8)}… on the launcher`);
-      const { request } = await client.simulateContract({ account: address, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
-      await sendAndWait(request);
+    }
+    if (prepared.permitTokens.length > 0) {
+      setStage("Sign the Permit2 approval");
+      permitData = await buildPermitData({
+        owner: address,
+        spender: wrapper,
+        chainId,
+        permit2: PERMIT2,
+        tokens: prepared.permitTokens,
+        publicClient: client,
+        signTypedData: signTypedDataAsync,
+      });
     }
 
-    // 3) simulate → write → wait
+    // 4) simulate → write → wait
     setStage("Simulating launch");
     const { request } = await client.simulateContract({
       account: address,
       address: wrapper,
       abi: CampaignWrapperAbi,
       functionName: "launchCampaign",
-      args: [prepared.params, "0x"],
+      args: [prepared.params, permitData],
       value: prepared.value,
     });
     setStage("Launching campaign");
