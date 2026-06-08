@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useAccount, usePublicClient, useSignTypedData, useWriteContract } from "wagmi";
 import { formatUnits, maxUint256, parseEventLogs, type Address, type Hex } from "viem";
 
-import { CampaignWrapperAbi, Erc20Abi, TokenFactoryAbi } from "@/lib/config/abi";
+import { CampaignWrapperAbi, CampaignWrapperAutoAbi, Erc20Abi } from "@/lib/config/abi";
 import { CONTRACTS } from "@/lib/config/contracts.generated";
 import { PERMIT2 } from "@/lib/config/uniswap";
 import { type SupportedChainId } from "@/lib/config/chains";
 import { decodeContractError } from "@/lib/tx/revert";
 import { buildPermitData } from "./permit2";
-import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "./launch";
+import { prepareAutoLaunch, prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "./launch";
 
 const ZERO = "0x0000000000000000000000000000000000000000" as Address;
 
@@ -65,38 +65,59 @@ export function useLaunch(chainId: SupportedChainId) {
     await sendAndWait(request);
   }
 
+  type Pull = { token: Address; amount: bigint };
+
+  /** Fail fast (before any approval) if the deployer lacks the seed amounts — clear message vs an
+   *  undecodable launchCampaign simulate revert from the Permit2.transferFrom pull. */
+  async function preflightBalances(pulls: Pull[], value: bigint) {
+    setStage("Checking balances");
+    for (const t of pulls) {
+      const bal = (await client!.readContract({ address: t.token, abi: Erc20Abi, functionName: "balanceOf", args: [address as Address] })) as bigint;
+      if (bal < t.amount) {
+        const dec = (await client!.readContract({ address: t.token, abi: Erc20Abi, functionName: "decimals" }).catch(() => 18)) as number;
+        const sym = (await client!.readContract({ address: t.token, abi: Erc20Abi, functionName: "symbol" }).catch(() => t.token.slice(0, 8))) as string;
+        throw new Error(`Insufficient ${sym}: need ${formatUnits(t.amount, dec)}, have ${formatUnits(bal, dec)}`);
+      }
+    }
+    if (value > 0n) {
+      const ethBal = await client!.getBalance({ address: address as Address });
+      if (ethBal < value) throw new Error(`Insufficient ETH: need ${formatUnits(value, 18)} (plus gas), have ${formatUnits(ethBal, 18)}`);
+    }
+  }
+
+  /** token → Permit2 (on-chain approve, once per token), then a single gasless Permit2 batch signature
+   *  (Permit2 → wrapper) folded into the launch tx. "0x" when nothing is pulled. */
+  async function signPermit(pulls: Pull[], wrapper: Address): Promise<Hex> {
+    for (const t of pulls) await approvePermit2IfNeeded(t.token, t.amount);
+    if (pulls.length === 0) return "0x";
+    setStage("Sign the Permit2 approval");
+    return buildPermitData({ owner: address as Address, spender: wrapper, chainId, permit2: PERMIT2, tokens: pulls, publicClient: client!, signTypedData: signTypedDataAsync });
+  }
+
+  /** simulate → write → wait → parse the CampaignLaunched event. */
+  async function submitLaunch(wrapper: Address, abi: unknown, args: readonly unknown[], value: bigint): Promise<{ pid: Hex; hash: Hex }> {
+    setStage("Simulating launch");
+    const { request } = await client!.simulateContract({ account: address as Address, address: wrapper, abi, functionName: "launchCampaign", args, value } as never);
+    setStage("Launching campaign");
+    const hash = await writeContractAsync(request);
+    setPendingHash(hash);
+    const receipt = await client!.waitForTransactionReceipt({ hash });
+    setPendingHash(undefined);
+    if (receipt.status !== "success") throw new Error("launch reverted");
+    const events = parseEventLogs({ abi: CampaignWrapperAbi, logs: receipt.logs, eventName: "CampaignLaunched" });
+    const pid = (events[0]?.args as { pid: Hex } | undefined)?.pid;
+    if (!pid) throw new Error("CampaignLaunched not found in receipt");
+    setStage(undefined);
+    return { pid, hash };
+  }
+
   async function launch(form: WizardForm): Promise<{ pid: Hex; hash: Hex }> {
     if (!client || !address) throw new Error("Wallet not connected");
     setError(undefined);
     setResult(undefined);
-    const { wrapper, factory } = CONTRACTS[chainId];
+    const { wrapper } = CONTRACTS[chainId];
 
-    // 1) Resolve the launched-token address. A fresh token paired with an ERC-20 must be deployed first
-    //    so currency ordering (orientation) is known before pricing.
-    let tokenAddress: Address | undefined;
-    let existingToken: Address | undefined;
-    let tokenDecimals = 18;
-
-    if (form.tokenMode === "existing") {
-      existingToken = form.existingToken;
-      tokenAddress = form.existingToken;
-      tokenDecimals = form.existingTokenDecimals;
-    } else if (form.pairMode === "erc20") {
-      setStage("Deploying token on the factory");
-      const cfg = { name: form.name, symbol: form.symbol, totalSupply: form.totalSupply };
-      const sim = await client.simulateContract({ account: address, address: factory, abi: TokenFactoryAbi, functionName: "deployToken", args: [cfg, address] });
-      tokenAddress = sim.result as Address;
-      await sendAndWait(sim.request);
-      existingToken = tokenAddress; // now held by the deployer → pulled via Permit2
-    }
-    // else: fresh token + native ETH — wrapper deploys it, orientation known (ETH = currency0).
-
-    const input: LaunchFormInput = {
-      newToken: form.tokenMode === "new" ? { name: form.name, symbol: form.symbol, totalSupply: form.totalSupply } : undefined,
-      existingToken,
-      tokenAddress,
-      tokenDecimals,
-      pair: form.pairMode === "native" ? { native: true } : { address: form.pairAddress, decimals: form.pairDecimals },
+    const base = {
       seedTokenHuman: form.seedToken,
       seedPairHuman: form.seedPair,
       launchDurationDays: form.durationDays,
@@ -110,69 +131,38 @@ export function useLaunch(chainId: SupportedChainId) {
       whitelistWindowMinutes: form.whitelistWindowMinutes,
     };
 
-    const prepared = prepareLaunch(input, Math.floor(Date.now() / 1000));
+    let out: { pid: Hex; hash: Hex };
 
-    // 2) Pre-flight: make sure the deployer actually holds the seed amounts BEFORE sending any
-    //    approvals, so a doomed launch fails fast with a clear reason instead of an undecodable
-    //    launchCampaign simulate revert (the wrapper pulls the token via Permit2.transferFrom).
-    setStage("Checking balances");
-    for (const t of prepared.permitTokens) {
-      const bal = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "balanceOf", args: [address] })) as bigint;
-      if (bal < t.amount) {
-        const dec = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "decimals" }).catch(() => 18)) as number;
-        const sym = (await client.readContract({ address: t.token, abi: Erc20Abi, functionName: "symbol" }).catch(() => t.token.slice(0, 8))) as string;
-        throw new Error(`Insufficient ${sym}: need ${formatUnits(t.amount, dec)}, have ${formatUnits(bal, dec)}`);
-      }
-    }
-    if (prepared.value > 0n) {
-      const ethBal = await client.getBalance({ address });
-      if (ethBal < prepared.value) {
-        throw new Error(`Insufficient ETH: need ${formatUnits(prepared.value, 18)} (plus gas), have ${formatUnits(ethBal, 18)}`);
-      }
-    }
-
-    // 3) Permit2: token → Permit2 (on-chain ERC-20 approve, once per token), then Permit2 → wrapper via a
-    //    single gasless batch SIGNATURE folded into the launch tx (permitData), instead of N on-chain
-    //    Permit2.approve transactions. The wrapper calls PERMIT2.permit(msg.sender, batch, signature).
-    let permitData: Hex = "0x";
-    for (const t of prepared.permitTokens) {
-      await approvePermit2IfNeeded(t.token, t.amount);
-    }
-    if (prepared.permitTokens.length > 0) {
-      setStage("Sign the Permit2 approval");
-      permitData = await buildPermitData({
-        owner: address,
-        spender: wrapper,
-        chainId,
-        permit2: PERMIT2,
-        tokens: prepared.permitTokens,
-        publicClient: client,
-        signTypedData: signTypedDataAsync,
-      });
+    if (form.tokenMode === "new" && form.pairMode === "erc20") {
+      // Fresh token + ERC-20 pair → auto-priced overload: the wrapper deploys the token in the same tx
+      // and computes the price/ticks/liquidity on-chain (no pre-deploy, only the pair is pulled).
+      const input: LaunchFormInput = {
+        ...base,
+        newToken: { name: form.name, symbol: form.symbol, totalSupply: form.totalSupply },
+        tokenDecimals: 18,
+        pair: { address: form.pairAddress, decimals: form.pairDecimals },
+      };
+      const { autoParams, permitTokens } = prepareAutoLaunch(input, Math.floor(Date.now() / 1000));
+      await preflightBalances(permitTokens, 0n);
+      const permitData = await signPermit(permitTokens, wrapper);
+      out = await submitLaunch(wrapper, CampaignWrapperAutoAbi, [autoParams, permitData], 0n);
+    } else {
+      // Existing token, or fresh token + native ETH → fully pre-computed CampaignParams overload.
+      const existingToken = form.tokenMode === "existing" ? form.existingToken : undefined;
+      const input: LaunchFormInput = {
+        ...base,
+        newToken: form.tokenMode === "new" ? { name: form.name, symbol: form.symbol, totalSupply: form.totalSupply } : undefined,
+        existingToken,
+        tokenAddress: existingToken,
+        tokenDecimals: form.tokenMode === "existing" ? form.existingTokenDecimals : 18,
+        pair: form.pairMode === "native" ? { native: true } : { address: form.pairAddress, decimals: form.pairDecimals },
+      };
+      const prepared = prepareLaunch(input, Math.floor(Date.now() / 1000));
+      await preflightBalances(prepared.permitTokens, prepared.value);
+      const permitData = await signPermit(prepared.permitTokens, wrapper);
+      out = await submitLaunch(wrapper, CampaignWrapperAbi, [prepared.params, permitData], prepared.value);
     }
 
-    // 4) simulate → write → wait
-    setStage("Simulating launch");
-    const { request } = await client.simulateContract({
-      account: address,
-      address: wrapper,
-      abi: CampaignWrapperAbi,
-      functionName: "launchCampaign",
-      args: [prepared.params, permitData],
-      value: prepared.value,
-    });
-    setStage("Launching campaign");
-    const hash = await writeContractAsync(request);
-    setPendingHash(hash);
-    const receipt = await client.waitForTransactionReceipt({ hash });
-    setPendingHash(undefined);
-    if (receipt.status !== "success") throw new Error("launch reverted");
-
-    const events = parseEventLogs({ abi: CampaignWrapperAbi, logs: receipt.logs, eventName: "CampaignLaunched" });
-    const pid = (events[0]?.args as { pid: Hex } | undefined)?.pid;
-    if (!pid) throw new Error("CampaignLaunched not found in receipt");
-    setStage(undefined);
-    const out = { pid, hash };
     setResult(out);
     return out;
   }

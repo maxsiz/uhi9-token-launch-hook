@@ -86,3 +86,16 @@ export interface LaunchSubmission {
   permitData: Hex; // "0x" when no ERC-20 pull is needed
   value: bigint; // native ETH seed forwarded as msg.value
 }
+
+/** Mirrors CampaignWrapper.AutoLaunchParams — fresh token + ERC-20 pair, priced on-chain. */
+export interface AutoLaunchParams {
+  tokenConfig: TokenDeployConfig;
+  pairToken: Address; // must be non-zero (ERC-20 pair)
+  fee: number; // 0x800000 if tax enabled
+  tickSpacing: number;
+  rangeTicks: number; // half-width around the implied price; 0 = full range
+  seedTokenAmount: bigint; // raw (18 dec)
+  seedPairAmount: bigint; // raw (pair decimals)
+  lpRecipient: Address;
+  launchConfig: LaunchConfig;
+}
