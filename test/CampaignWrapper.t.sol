@@ -9,6 +9,7 @@ import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
 import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionManager.sol";
 
@@ -20,7 +21,9 @@ import {TokenLaunchHookTestBase} from "./utils/TokenLaunchHookTestBase.sol";
 import {CampaignWrapper} from "../src/CampaignWrapper.sol";
 import {TokenFactory, TokenDeployConfig} from "../src/TokenFactory.sol";
 import {TokenLaunchHook} from "../src/TokenLaunchHook.sol";
+import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {MechanismConfig} from "../src/lib/MechanismConfig.sol";
+import {PoolMath} from "../src/lib/PoolMath.sol";
 
 contract CampaignWrapperTest is TokenLaunchHookTestBase {
     using PoolIdLibrary for PoolKey;
@@ -242,5 +245,121 @@ contract CampaignWrapperTest is TokenLaunchHookTestBase {
             // The bootstrap's price check reverts WrongInitPrice, bubbled via HookCallFailed/WrappedError.
             assertTrue(_hasSelector(reason, TokenLaunchHook.WrongInitPrice.selector), "expected WrongInitPrice");
         }
+    }
+
+    // -------------------------------------------------------------------
+    // Auto-priced overload: launchCampaign(AutoLaunchParams, …) — fresh token + ERC-20 pair
+    // -------------------------------------------------------------------
+
+    function _autoParams(address pair, uint24 fee) internal view returns (CampaignWrapper.AutoLaunchParams memory p) {
+        p.tokenConfig = TokenDeployConfig({name: "Launch", symbol: "LCH", totalSupply: 1_000_000 ether});
+        p.pairToken = pair;
+        p.fee = fee;
+        p.tickSpacing = 60;
+        p.rangeTicks = 6000;
+        p.seedTokenAmount = 100_000 ether;
+        p.seedPairAmount = 1 ether;
+        p.lpRecipient = deployer;
+        p.launchConfig = _config(_noModules());
+    }
+
+    /// @dev Deploy a StandardToken pair on the chosen side of `token` (to force the sort), mint its supply
+    ///      to the deployer and grant the ERC-20→Permit2 allowance (Permit2→wrapper is set per-test).
+    function _deployPairOnSide(bool greater, address token) internal returns (address) {
+        for (uint256 i = 0; i < 256; i++) {
+            MockERC20 t = new MockERC20("Pair", "PAIR", 18);
+            bool ok = greater ? uint160(address(t)) > uint160(token) : uint160(address(t)) < uint160(token);
+            if (ok) {
+                t.mint(deployer, 1_000_000 ether);
+                vm.prank(deployer);
+                IERC20(address(t)).approve(address(permit2), type(uint256).max);
+                return address(t);
+            }
+        }
+        revert("no pair on requested side");
+    }
+
+    /// @dev A signed single-token Permit2 batch granting the wrapper allowance for `token`.
+    function _signedPermitSingle(address token) internal view returns (bytes memory) {
+        IAllowanceTransfer.PermitDetails[] memory details = new IAllowanceTransfer.PermitDetails[](1);
+        details[0] = IAllowanceTransfer.PermitDetails({
+            token: token, amount: type(uint160).max, expiration: uint48(block.timestamp + 1 days), nonce: 0
+        });
+        IAllowanceTransfer.PermitBatch memory batch = IAllowanceTransfer.PermitBatch({
+            details: details, spender: address(wrapper), sigDeadline: block.timestamp + 1 days
+        });
+        bytes32 digest =
+            keccak256(abi.encodePacked("\x19\x01", IEIP712(address(permit2)).DOMAIN_SEPARATOR(), batch.hash()));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerPk, digest);
+        return abi.encode(batch, abi.encodePacked(r, s, v));
+    }
+
+    /// @dev Assert the pool was initialized at the price implied by the seed amounts for the actual orientation.
+    function _assertPricedFromSeeds(PoolKey memory key, address pair, CampaignWrapper.AutoLaunchParams memory p)
+        internal
+        view
+    {
+        address tokenAddr =
+            Currency.unwrap(key.currency0) == pair ? Currency.unwrap(key.currency1) : Currency.unwrap(key.currency0);
+        bool tokenIsC0 = Currency.unwrap(key.currency0) == tokenAddr;
+        (uint256 a0, uint256 a1) =
+            tokenIsC0 ? (p.seedTokenAmount, p.seedPairAmount) : (p.seedPairAmount, p.seedTokenAmount);
+        (uint160 sqrtNow,,,) = StateLibrary.getSlot0(manager, key.toId());
+        assertEq(sqrtNow, PoolMath.sqrtPriceX96From(a1, a0), "pool not priced from seed amounts");
+    }
+
+    /// Fresh token sorts below the pair (token == currency0); price computed on-chain from seeds.
+    function test_autoLaunch_tokenIsCurrency0() public {
+        address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
+        address pair = _deployPairOnSide(true, predicted); // pair > token ⇒ token is currency0
+        _grantWrapperAllowance(pair);
+        CampaignWrapper.AutoLaunchParams memory p = _autoParams(pair, 3000);
+
+        vm.prank(deployer, deployer);
+        (PoolKey memory key, uint256 govId) = wrapper.launchCampaign(p, "");
+
+        assertGt(govId, 0, "no gov NFT");
+        assertEq(Currency.unwrap(key.currency0), predicted, "token should be currency0");
+        assertEq(launchHook.governanceTokenIdOf(key.toId()), govId);
+        assertEq(IERC721(address(lpm)).ownerOf(govId), deployer);
+        _assertPricedFromSeeds(key, pair, p);
+    }
+
+    /// Fresh token sorts above the pair (token == currency1) — the reverse orientation.
+    function test_autoLaunch_tokenIsCurrency1() public {
+        address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
+        address pair = _deployPairOnSide(false, predicted); // pair < token ⇒ token is currency1
+        _grantWrapperAllowance(pair);
+        CampaignWrapper.AutoLaunchParams memory p = _autoParams(pair, 3000);
+
+        vm.prank(deployer, deployer);
+        (PoolKey memory key, uint256 govId) = wrapper.launchCampaign(p, "");
+
+        assertGt(govId, 0, "no gov NFT");
+        assertEq(Currency.unwrap(key.currency1), predicted, "token should be currency1");
+        _assertPricedFromSeeds(key, pair, p);
+    }
+
+    /// The auto overload pulls the pair via a signed Permit2 batch (no direct allowance).
+    function test_autoLaunch_withPermit2Signature() public {
+        address predicted = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
+        address pair = _deployPairOnSide(true, predicted);
+        CampaignWrapper.AutoLaunchParams memory p = _autoParams(pair, 3000);
+        bytes memory permitData = _signedPermitSingle(pair); // before the prank — it makes an external call
+
+        vm.prank(deployer, deployer);
+        (PoolKey memory key, uint256 govId) = wrapper.launchCampaign(p, permitData);
+
+        assertGt(govId, 0);
+        assertEq(launchHook.governanceTokenIdOf(key.toId()), govId);
+        _assertPricedFromSeeds(key, pair, p);
+    }
+
+    /// The auto overload is ERC-20-pair only; a native pair is rejected (use the CampaignParams method).
+    function test_autoLaunch_nativePair_reverts() public {
+        CampaignWrapper.AutoLaunchParams memory p = _autoParams(address(0), 3000);
+        vm.prank(deployer, deployer);
+        vm.expectRevert(CampaignWrapper.PairRequired.selector);
+        wrapper.launchCampaign(p, "");
     }
 }
