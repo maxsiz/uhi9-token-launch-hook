@@ -26,8 +26,17 @@ export interface BuildParamsInput {
   mint: MintMathOutput;
 }
 
-export function buildCampaignParams(i: BuildParamsInput): CampaignParams {
-  const launchConfig: LaunchConfig = {
+/** The hookData launch config. `deployer`/`tokenIsCurrency0`/`expectedInitialSqrtPrice` are injected by
+ *  the wrapper, so they stay zero/false here. Reused by the pre-computed and auto-priced launch paths. */
+export function buildLaunchConfig(i: {
+  launchDurationSeconds: bigint;
+  enabled: EnabledMechanisms;
+  antiSnipe: BuildParamsInput["antiSnipe"];
+  tax: BuildParamsInput["tax"];
+  lock: BuildParamsInput["lock"];
+  whitelist: BuildParamsInput["whitelist"];
+}): LaunchConfig {
+  return {
     deployer: ZERO, // wrapper sets = msg.sender
     launchDuration: i.launchDurationSeconds,
     tokenIsCurrency0: false, // wrapper sets from PoolKey sorting
@@ -38,6 +47,10 @@ export function buildCampaignParams(i: BuildParamsInput): CampaignParams {
     lock: { ...i.lock },
     whitelist: { ...i.whitelist },
   };
+}
+
+export function buildCampaignParams(i: BuildParamsInput): CampaignParams {
+  const launchConfig = buildLaunchConfig(i);
 
   return {
     existingToken: i.existingToken ?? ZERO,

@@ -37,6 +37,17 @@ function readBroadcast(chainId: number): { found: Record<string, string>; deploy
       found[tx.contractName] = tx.contractAddress;
     }
   }
+  // A standalone DeployWrapper run (a new CampaignWrapper bound to the existing hook/factory — e.g. to
+  // ship the auto-priced overload) overrides just the wrapper address; the rest of the stack is unchanged.
+  const wf = join(REPO_ROOT, "broadcast", "DeployWrapper.s.sol", String(chainId), "run-latest.json");
+  if (existsSync(wf)) {
+    const wj = JSON.parse(readFileSync(wf, "utf8"));
+    if (Array.isArray(wj.receipts) && wj.receipts.length > 0) {
+      for (const tx of wj.transactions ?? []) {
+        if (tx.contractName === "CampaignWrapper" && tx.contractAddress) found.CampaignWrapper = tx.contractAddress;
+      }
+    }
+  }
   // Earliest receipt block — lower bound for log discovery scans.
   const blocks = json.receipts.map((r: { blockNumber?: string }) => (r.blockNumber ? BigInt(r.blockNumber) : 0n)).filter((b: bigint) => b > 0n);
   const deployBlock = blocks.length ? blocks.reduce((m: bigint, b: bigint) => (b < m ? b : m)) : 0n;

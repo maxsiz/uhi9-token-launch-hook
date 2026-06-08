@@ -108,15 +108,18 @@ export function LaunchWizard() {
   const seedTokenOver = seedTokenAvail != null && toWeiSafe(seedToken, seedTokenDecimals) > seedTokenAvail;
   const seedPairOver = seedPairAvail != null && toWeiSafe(seedPair, seedPairDecimals) > seedPairAvail;
 
+  // Fresh token + ERC-20 pair uses the auto-priced overload: the wrapper deploys the token and computes
+  // sqrtPrice / ticks / liquidity on-chain, so the off-chain preview can't show those orientation-bound
+  // values (they depend on the not-yet-known token address).
+  const isAuto = tokenMode === "new" && pairMode === "erc20";
+
   // What this launch will actually do — shown upfront so multiple wallet prompts aren't a surprise.
-  // Native-ETH + fresh token is one tx (the wrapper deploys the token in the same call); an ERC-20 pair
-  // with a fresh token needs a separate deploy tx first (the price depends on the token's address).
   const launchSteps: { kind: "tx" | "sign"; label: string }[] = (() => {
-    const freshErc20 = tokenMode === "new" && pairMode === "erc20";
     const steps: { kind: "tx" | "sign"; label: string }[] = [];
-    if (freshErc20) steps.push({ kind: "tx", label: `Deploy ${tokenSym} (separate tx — required to price an ERC-20 pair)` });
+    // A fresh token is always deployed inside the launch tx (native-ETH pair, or the auto-priced
+    // ERC-20-pair overload) — so it's never pulled. Only existing tokens and ERC-20 pairs are pulled.
     const pulled: string[] = [];
-    if (tokenMode === "existing" || freshErc20) pulled.push(tokenSym);
+    if (tokenMode === "existing") pulled.push(tokenSym);
     if (pairMode === "erc20") pulled.push(pairSym);
     if (pulled.length) {
       steps.push({ kind: "tx", label: `Approve ${pulled.join(" & ")} for Permit2 (one-time — skipped if already approved)` });
@@ -124,7 +127,7 @@ export function LaunchWizard() {
     }
     steps.push({
       kind: "tx",
-      label: tokenMode === "new" && pairMode === "native" ? "Launch — your token is deployed in the same transaction" : "Launch campaign",
+      label: tokenMode === "new" ? "Launch — your token is deployed in the same transaction" : "Launch campaign",
     });
     return steps;
   })();
@@ -383,10 +386,20 @@ export function LaunchWizard() {
               <Row label="Initial price">
                 {formatPriceHuman(pairPerToken)} {pairSym}/{tokenSym} · {formatPriceHuman(tokenPerPair)} {tokenSym}/{pairSym}
               </Row>
-              <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
-              <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
-              <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, preview.decimals0, 4)} / {formatAmount(preview.params.amount1Max, preview.decimals1, 4)}</Row>
-              {preview.value > 0n && <Row label="ETH value">{formatAmount(preview.value, 18, 6)}</Row>}
+              {isAuto ? (
+                <>
+                  <Row label="Seed token">{seedToken} {tokenSym}</Row>
+                  <Row label="Seed pair">{seedPair} {pairSym}</Row>
+                  <p className="pt-1 text-xs text-neutral-500">Exact ticks &amp; liquidity are computed on-chain when you launch (the token is deployed in the same transaction).</p>
+                </>
+              ) : (
+                <>
+                  <Row label="Ticks">{preview.params.tickLower} … {preview.params.tickUpper}</Row>
+                  <Row label="Liquidity">{preview.params.liquidity.toString()}</Row>
+                  <Row label="Max token0 / token1">{formatAmount(preview.params.amount0Max, preview.decimals0, 4)} / {formatAmount(preview.params.amount1Max, preview.decimals1, 4)}</Row>
+                  {preview.value > 0n && <Row label="ETH value">{formatAmount(preview.value, 18, 6)}</Row>}
+                </>
+              )}
             </div>
           ) : (
             <p className="text-sm text-amber-300">Fill in token, pair and seed amounts to preview the launch.</p>
