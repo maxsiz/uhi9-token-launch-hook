@@ -15,6 +15,8 @@ import { prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "@/l
 import { useLaunch, type WizardForm } from "@/lib/campaign/useLaunch";
 import { useErc20Meta, type Erc20Meta } from "@/lib/useErc20Meta";
 import { formatAmount, formatPriceHuman, truncateAddress } from "@/lib/format";
+import { Spinner } from "@/components/ui/Spinner";
+import { TxStatus } from "@/components/ui/TxStatus";
 
 const num = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9]/g, "");
 const dec = (e: { target: { value: string } }) => e.target.value.replace(/[^0-9.]/g, "");
@@ -107,7 +109,7 @@ export function LaunchWizard() {
   const seedPairOver = seedPairAvail != null && toWeiSafe(seedPair, seedPairDecimals) > seedPairAvail;
 
   const plan = useMemo(() => hookPlan(enabled), [enabled]);
-  const { run, stage, error, result } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
+  const { run, stage, error, result, pendingHash } = useLaunch((supported ? chainId : 1301) as SupportedChainId);
 
   function choosePreset(id: PresetId) {
     setPresetId(id);
@@ -392,9 +394,11 @@ export function LaunchWizard() {
                 Deploys the token (if new + ERC-20 pair), signs Permit2 (if pulling ERC-20s), then
                 <code className="mx-1 font-mono">simulate → launchCampaign</code>. Fresh token + native ETH needs no Permit2.
               </p>
-              <button className="btn-primary" disabled={!supported || !!stage || seedTokenOver || seedPairOver} onClick={() => run(form)}>
+              <button className="btn-primary flex items-center gap-2" disabled={!supported || !!stage || seedTokenOver || seedPairOver} onClick={() => run(form)}>
+                {stage && <Spinner className="h-4 w-4" />}
                 {stage ?? "Launch campaign"}
               </button>
+              {pendingHash && <TxStatus phase="pending" hash={pendingHash} chainId={chainId as SupportedChainId} />}
               {(seedTokenOver || seedPairOver) && (
                 <p className="text-xs text-red-400">Seed amount exceeds your balance — adjust it on the Pool &amp; price step.</p>
               )}

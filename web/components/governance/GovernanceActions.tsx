@@ -9,6 +9,7 @@ import { TokenLaunchHookAbi } from "@/lib/config/abi";
 import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
 import { formatUtc, percentToTaxUnits, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 import { decodeContractError } from "@/lib/tx/revert";
+import { TxStatus, type TxPhase } from "@/components/ui/TxStatus";
 
 function toUnix(local: string): bigint {
   return BigInt(Math.floor(new Date(local).getTime() / 1000));
@@ -34,6 +35,8 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
   const [busy, setBusy] = useState<string | undefined>();
   const [txHash, setTxHash] = useState<Hex | undefined>();
   const [err, setErr] = useState<string | undefined>();
+  const [phase, setPhase] = useState<TxPhase>();
+  const [pendingHash, setPendingHash] = useState<Hex | undefined>();
 
   // local form state
   const [buyTax, setBuyTax] = useState("");
@@ -60,8 +63,11 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
   async function run(key: string, fn: () => Promise<Hex>) {
     setErr(undefined);
     setBusy(key);
+    setPhase("confirm");
     try {
       const hash = await fn();
+      setPendingHash(hash);
+      setPhase("pending");
       await client?.waitForTransactionReceipt({ hash });
       setTxHash(hash);
       await refetch?.();
@@ -69,6 +75,8 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
       setErr(decodeContractError(e, "Transaction failed"));
     } finally {
       setBusy(undefined);
+      setPhase(undefined);
+      setPendingHash(undefined);
     }
   }
 
@@ -89,6 +97,7 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
 
   return (
     <div className="space-y-4">
+      {phase && <TxStatus phase={phase} hash={pendingHash} chainId={chainId} />}
       {en.tax && (
         <div className="card space-y-2">
           <h4 className="text-sm font-semibold">Tax — ratchet down</h4>

@@ -13,6 +13,8 @@ import { formatAmount, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 import { quoteExactInputSingle } from "@/lib/swap/quote";
 import { decodeRevertReason } from "@/lib/swap/revertReason";
 import { buildUniversalRouterSwap } from "@/lib/swap/buildSwap";
+import { Spinner } from "@/components/ui/Spinner";
+import { TxStatus, type TxPhase } from "@/components/ui/TxStatus";
 import {
   MAX_UINT160,
   MAX_UINT256,
@@ -47,6 +49,8 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
   const [busy, setBusy] = useState(false);
   const [txHash, setTxHash] = useState<Hex | undefined>();
   const [actionErr, setActionErr] = useState<string | undefined>();
+  const [phase, setPhase] = useState<TxPhase>();
+  const [pendingHash, setPendingHash] = useState<Hex | undefined>();
 
   // ── Token metadata for both pool currencies ──
   const c0 = campaign?.poolKey.currency0;
@@ -203,8 +207,11 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
   async function runWrite(fn: () => Promise<Hex>) {
     setActionErr(undefined);
     setBusy(true);
+    setPhase("confirm");
     try {
       const hash = await fn();
+      setPendingHash(hash);
+      setPhase("pending");
       await client?.waitForTransactionReceipt({ hash });
       setTxHash(hash);
       await Promise.all([allowanceReads.refetch?.(), wlRead.refetch?.()]);
@@ -212,6 +219,8 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       setActionErr(decodeRevertReason(e));
     } finally {
       setBusy(false);
+      setPhase(undefined);
+      setPendingHash(undefined);
     }
   }
 
@@ -320,10 +329,12 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
         <p className="text-[11px] text-neutral-500">Slippage {slippageBps / 100}% · quote via V4Quoter</p>
       </div>
 
-      <button className="btn-primary w-full" disabled={primary.disabled} onClick={primary.onClick}>
+      <button className="btn-primary flex w-full items-center justify-center gap-2" disabled={primary.disabled} onClick={primary.onClick}>
+        {busy && <Spinner className="h-4 w-4" />}
         {primary.label}
       </button>
 
+      {phase && <TxStatus phase={phase} hash={pendingHash} chainId={chainId} />}
       {actionErr && <p className="text-xs text-red-400">{actionErr}</p>}
       {txHash && (
         <a

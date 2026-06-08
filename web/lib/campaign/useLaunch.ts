@@ -40,6 +40,17 @@ export function useLaunch(chainId: SupportedChainId) {
   const [stage, setStage] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<{ pid: Hex; hash: Hex } | undefined>();
+  const [pendingHash, setPendingHash] = useState<Hex | undefined>();
+
+  // Send a validated write request and wait for it to mine, tracking the pending hash so the UI can show
+  // a "transaction pending" spinner + explorer link during the (sometimes long) mining wait.
+  async function sendAndWait(request: Parameters<typeof writeContractAsync>[0]): Promise<Hex> {
+    const hash = await writeContractAsync(request);
+    setPendingHash(hash);
+    await client!.waitForTransactionReceipt({ hash });
+    setPendingHash(undefined);
+    return hash;
+  }
 
   async function approvePermit2IfNeeded(token: Address, amount: bigint) {
     const allowance = (await client!.readContract({
@@ -51,8 +62,7 @@ export function useLaunch(chainId: SupportedChainId) {
     if (allowance >= amount) return;
     setStage(`Approving ${token.slice(0, 8)}… for Permit2`);
     const { request } = await client!.simulateContract({ account: address as Address, address: token, abi: Erc20Abi, functionName: "approve", args: [PERMIT2, maxUint256] });
-    const hash = await writeContractAsync(request);
-    await client!.waitForTransactionReceipt({ hash });
+    await sendAndWait(request);
   }
 
   async function launch(form: WizardForm): Promise<{ pid: Hex; hash: Hex }> {
@@ -76,8 +86,7 @@ export function useLaunch(chainId: SupportedChainId) {
       const cfg = { name: form.name, symbol: form.symbol, totalSupply: form.totalSupply };
       const sim = await client.simulateContract({ account: address, address: factory, abi: TokenFactoryAbi, functionName: "deployToken", args: [cfg, address] });
       tokenAddress = sim.result as Address;
-      const dh = await writeContractAsync(sim.request);
-      await client.waitForTransactionReceipt({ hash: dh });
+      await sendAndWait(sim.request);
       existingToken = tokenAddress; // now held by the deployer → pulled via Permit2
     }
     // else: fresh token + native ETH — wrapper deploys it, orientation known (ETH = currency0).
@@ -133,8 +142,7 @@ export function useLaunch(chainId: SupportedChainId) {
       if (allowed >= t.amount && exp > now + 300) continue;
       setStage(`Enabling ${t.token.slice(0, 8)}… on the launcher`);
       const { request } = await client.simulateContract({ account: address, address: PERMIT2, abi: Permit2Abi, functionName: "approve", args: [t.token, wrapper, MAX_UINT160, expiration] });
-      const gh = await writeContractAsync(request);
-      await client.waitForTransactionReceipt({ hash: gh });
+      await sendAndWait(request);
     }
 
     // 3) simulate → write → wait
@@ -149,7 +157,9 @@ export function useLaunch(chainId: SupportedChainId) {
     });
     setStage("Launching campaign");
     const hash = await writeContractAsync(request);
+    setPendingHash(hash);
     const receipt = await client.waitForTransactionReceipt({ hash });
+    setPendingHash(undefined);
     if (receipt.status !== "success") throw new Error("launch reverted");
 
     const events = parseEventLogs({ abi: CampaignWrapperAbi, logs: receipt.logs, eventName: "CampaignLaunched" });
@@ -167,9 +177,10 @@ export function useLaunch(chainId: SupportedChainId) {
     } catch (e: unknown) {
       setError(decodeContractError(e, "Launch failed"));
       setStage(undefined);
+      setPendingHash(undefined);
       return undefined;
     }
   }
 
-  return { run, stage, error, result, ZERO };
+  return { run, stage, error, result, pendingHash, ZERO };
 }
