@@ -29,7 +29,7 @@ an optional **whitelist phase**. You enable whichever you want, per launch.
 Who controls a launch? Whoever holds the **governance NFT** — which is just the deployer's own liquidity position. No owner address, no admin key. Every change is a one-way ratchet: you can only make it *fairer* — lower the tax, shorten the lock — never the reverse. When the launch window ends, all mechanisms are disabled and the pool continues to operate in normal swap mode.
 
 **[01:48 · Slide 6 — Architecture]**
-Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData.
+Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData..
 
 **[02:04 · Slide 7 — Wallets, injected only]**
 On the front end, the studio talks to wallets through **one** thing — an *injected* provider: the
