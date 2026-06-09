@@ -15,6 +15,40 @@ V4 hook attached to a newly launched token's pool. Enforces fair-launch rules (a
 
 **147 tests green** — unit · fuzz · mainnet-fork. Live on **Ethereum**, **Unichain** & **Unichain Sepolia**. See [`web/`](web/) for the Studio dApp and [`presentation/`](presentation/) for the deck.
 
+## Deployed contracts
+
+One shared, non-upgradeable stack per chain. `Permit2` is canonical everywhere
+(`0x000000000022D473030F116dDEE9F6B43aC78BA3`).
+
+### Ethereum mainnet
+
+| Contract | Address |
+|---|---|
+| TokenLaunchHook | [`0x0b93309f6b6e404769de885dac66cb357ad30ac0`](https://etherscan.io/address/0x0b93309f6b6e404769de885dac66cb357ad30ac0) |
+| CampaignWrapper | [`0x205549bcb010d429354aabc2cae057b090bcf5b8`](https://etherscan.io/address/0x205549bcb010d429354aabc2cae057b090bcf5b8) |
+| TokenFactory | [`0xa373fbacd0964fcb7bc01cb447a2f25f11e8995b`](https://etherscan.io/address/0xa373fbacd0964fcb7bc01cb447a2f25f11e8995b) |
+| CampaignLens | [`0xf8da8dc6d8cdcadcc96b51d5fc0cb59ef3672005`](https://etherscan.io/address/0xf8da8dc6d8cdcadcc96b51d5fc0cb59ef3672005) |
+
+### Unichain
+
+| Contract | Address |
+|---|---|
+| TokenLaunchHook | [`0xd5ca99907f2db792dcd4865e7d12df5f71874ac0`](https://uniscan.xyz/address/0xd5ca99907f2db792dcd4865e7d12df5f71874ac0) |
+| CampaignWrapper | [`0xcc20f7c7763ef77703a552e75e27ceaea99dc8cb`](https://uniscan.xyz/address/0xcc20f7c7763ef77703a552e75e27ceaea99dc8cb) |
+| TokenFactory | [`0x653bce4d7a6cf5c4fdbbd5fc6b2bb41c8eafc56a`](https://uniscan.xyz/address/0x653bce4d7a6cf5c4fdbbd5fc6b2bb41c8eafc56a) |
+| CampaignLens | [`0x22bbbe241464ab67c9b4f0881fa45f7f2d26870f`](https://uniscan.xyz/address/0x22bbbe241464ab67c9b4f0881fa45f7f2d26870f) |
+
+### Unichain Sepolia (testnet)
+
+| Contract | Address |
+|---|---|
+| TokenLaunchHook | [`0x79880abb0c03233e40b87452e7a45abd96ab0ac0`](https://sepolia.uniscan.xyz/address/0x79880abb0c03233e40b87452e7a45abd96ab0ac0) |
+| CampaignWrapper | [`0x0ae47666b31fe6e684c381cbea7a80748682d575`](https://sepolia.uniscan.xyz/address/0x0ae47666b31fe6e684c381cbea7a80748682d575) |
+| TokenFactory | [`0x41cb3079a635bc11183c188281b8db14e4c57f9a`](https://sepolia.uniscan.xyz/address/0x41cb3079a635bc11183c188281b8db14e4c57f9a) |
+| CampaignLens | [`0x5a94af1fad259528c8825f254c3d1f85e7896e9e`](https://sepolia.uniscan.xyz/address/0x5a94af1fad259528c8825f254c3d1f85e7896e9e) |
+
+<sub>Source of truth: [`web/lib/config/contracts.generated.ts`](web/lib/config/contracts.generated.ts) (generated from Foundry broadcasts). Not yet deployed on Base / Arbitrum.</sub>
+
 ## Build & test
 
 Foundry project (solc 0.8.26, EVM `cancun`, `ffi = true`). Dependencies are git submodules and are
