@@ -10,7 +10,10 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "gen:contracts": "tsx scripts/gen-contracts.ts"
+    "gen:contracts": "tsx scripts/gen-contracts.ts",
+    "e2e:autolaunch": "esbuild scripts/e2e-autolaunch.ts --bundle --platform=node --format=cjs --tsconfig=tsconfig.json --outfile=.e2e/out.cjs && set -a && . ./.env.local && set +a && node .e2e/out.cjs",
+    "e2e:mechanisms": "esbuild scripts/e2e-mechanisms.ts --bundle --platform=node --format=cjs --tsconfig=tsconfig.json --outfile=.e2e/mech.cjs && set -a && . ./.env.local && set +a && node .e2e/mech.cjs",
+    "e2e:ui": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",
@@ -26,10 +29,12 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "esbuild": "^0.28.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "tsx": "^4.16.2",
