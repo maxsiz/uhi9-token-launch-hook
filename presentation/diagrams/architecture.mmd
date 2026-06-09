@@ -1,0 +1,16 @@
+sequenceDiagram
+  autonumber
+  actor D as Deployer (EOA)
+  participant W as CampaignWrapper
+  participant F as TokenFactory
+  participant PM as PositionManager
+  participant H as TokenLaunchHook
+  D->>W: launchCampaign(params)
+  opt fresh token
+    W->>F: deploy ERC-20
+  end
+  W->>PM: multicall([initializePool, mint])
+  PM->>H: beforeAddLiquidity (first mint)
+  Note over H: bootstrap — capture gov NFT<br/>(salt == tokenId), arm mechanisms
+  PM-->>D: LP position = governance NFT
+  Note over W,H: one atomic tx · one shared hook (mined CREATE2) · once per chain

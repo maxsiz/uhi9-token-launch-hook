@@ -1,0 +1,13 @@
+flowchart TB
+  LP["First LP position<br/>salt == tokenId"]:::live --> NFT["= Governance NFT<br/>no admin key"]:::live
+  NFT --> R{"holder changes a param"}:::dec
+  R -->|"relax ✓ — tax↓ · lock shorter"| OK["hook accepts"]:::ok
+  R -->|"tighten ✗"| NO["hook reverts<br/>CanOnlyRelax"]:::no
+  NFT -. "transfer" .-> SAFE["Safe / DAO"]:::ghost
+  WIN(["launch window ends"]):::frozen --> FREEZE["all params freeze"]:::frozen
+  classDef live fill:#0b3b2e,stroke:#10b981,stroke-width:2px,color:#e5e7eb;
+  classDef dec fill:#1f2937,stroke:#9ca3af,color:#e5e7eb;
+  classDef ok fill:#064e3b,stroke:#34d399,color:#d1fae5;
+  classDef no fill:#3b0d22,stroke:#ff007a,color:#fecdd3;
+  classDef ghost fill:#111827,stroke:#374151,color:#9ca3af,stroke-dasharray:5 4;
+  classDef frozen fill:#1f2937,stroke:#6b7280,color:#9ca3af;

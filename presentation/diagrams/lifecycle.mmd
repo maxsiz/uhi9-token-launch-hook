@@ -1,0 +1,22 @@
+flowchart LR
+  subgraph SW["Swap"]
+    direction TB
+    BS["beforeSwap"]:::cb
+    AS["afterSwap"]:::cb
+  end
+  subgraph LQ["Liquidity"]
+    direction TB
+    BA["beforeAddLiquidity"]:::cb
+    BR["beforeRemoveLiquidity"]:::cb
+  end
+  BS --> ANTI["Anti-snipe — cap buy size"]:::m
+  BS --> TAX["Buy/sell tax — dynamic LP fee"]:::m
+  BS --> WL["Whitelist gate"]:::m
+  BA --> BOOT["Bootstrap — capture gov NFT"]:::m
+  BA --> WL
+  AS --> VOL["Track volume"]:::m
+  BR --> LOCK["Liquidity lock"]:::m
+  classDef cb fill:#0f172a,stroke:#60a5fa,color:#dbeafe,font-family:monospace;
+  classDef m fill:#134e4a,stroke:#2dd4bf,color:#ccfbf1;
+  style SW fill:#0b0f14,stroke:#3b82f6,color:#93c5fd;
+  style LQ fill:#0b0f14,stroke:#3b82f6,color:#93c5fd;

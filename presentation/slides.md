@@ -1,52 +1,43 @@
 # TokenLaunchHook&nbsp;Studio
 
-## Fair token launches, enforced by a Uniswap&nbsp;v4 hook
+## A studio for Uniswap&nbsp;v4 launch hooks
 
-<p class="subtitle">One hook. Anti-snipe · tax · liquidity lock · whitelist — without touching the ERC-20.</p>
+<img class="diagram compact" src="diagrams/studio.svg" alt="Studio is a hook platform: TokenLaunchHook is one shipped example with pluggable mechanisms; more hooks can plug in" />
 
-<p class="muted">Hackathon submission · live on Ethereum, Unichain &amp; Unichain Sepolia</p>
+<p class="muted"><span class="pink">This is one example hook</span> — pluggable hooks &amp; mechanisms · four fair-launch mechanisms · live on Ethereum, Unichain &amp; Unichain Sepolia</p>
 
 Note:
-Hi — this is TokenLaunchHook Studio. It makes token launches fair, and it does it as a single Uniswap v4 hook, without changing the token contract. Let me show you the problem first.
+Hi — this is TokenLaunchHook Studio. Think of it as a studio for launch hooks: the framework is a single shared v4 hook plus pluggable mechanisms, and what you'll see today is *one* hook — a fair-launch hook — built on it as the example. Other hooks and other mechanisms can plug into the same studio. And it does all this as a Uniswap v4 hook, without ever changing the token contract. Let me show you the problem it solves first.
 
 ---
 
-## Every token launch is a battlefield
+## A fix for the pains every campaign hits
 
-- 🤖 **Snipers** grab the first block and dump on everyone
-- 🥪 **Sandwich bots** tax every early buyer
-- 🪤 **Rug pulls** — the deployer yanks liquidity
+<img class="diagram wide" src="diagrams/pains.svg" alt="Snipers, sandwich bots, rug pulls and unfair access all happen in the pool; one v4 hook answers each with a cap on buy size, a decaying tax, a liquidity lock and a whitelist phase" />
 
-Today "fairness" lives in *custom ERC-20 code* — extra surface, extra audits — or it doesn't exist at all.
+<p class="muted">Today that fairness lives in <em>custom ERC-20 code</em> — extra surface, extra audits — or it doesn't exist. Every pain happens in the pool, so the fix belongs in the pool.</p>
 
 Note:
-Every launch gets sniped, sandwiched, or rugged. And the usual fix is to bake anti-bot logic into the token itself — which means more code to audit and a token that's hard to integrate. We thought: the unfairness happens in the pool, so the rules should live in the pool.
+Every launch is a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax every early buyer. Teams pull the liquidity. And nobody gets fair access — it's a free-for-all. These are the real pains of running a campaign, and this hook is built to answer each one — directly. The usual alternative is to bake anti-bot logic into the ERC-20 itself, which means more code to audit and a token that's hard to integrate. Our point: every one of these pains happens in the pool, so the fix should live in the pool — not in the token.
 
 ---
 
-## The insight
+## The insight — rules in the *pool*, not the token
 
-Move the rules into the **pool**, not the token.
+<img class="diagram" src="diagrams/pool-vs-token.svg" alt="A plain untouched ERC-20 is listed in a v4 pool whose TokenLaunchHook runs on every swap, add and remove, enforcing anti-snipe, tax, lock and whitelist" />
 
-One Uniswap **v4 hook** enforces fair-launch rules for *any* token.
-
-<p class="subtitle">The ERC-20 stays a plain ERC-20. The hook does the work — at the swap, at the mint, at the exit.</p>
+<p class="caption">The ERC-20 stays a plain ERC-20 — bring your own. The hook does the work at the swap, the mint, the exit.</p>
 
 Note:
 v4 hooks let you run code on every pool action. So we wrote one hook that enforces the launch rules on swaps, liquidity adds, and removals. The token is untouched — you can even bring your own existing ERC-20.
 
 ---
 
-## Four launch mechanisms
+## Four mechanisms, wired to hook callbacks
 
-| Mechanism | What it does | Hook callback |
-|---|---|---|
-| **Anti-snipe** | caps single buy size during the window | `beforeSwap` |
-| **Buy / sell tax** | asymmetric fee, *decays* to a base rate | `beforeSwap` |
-| **Liquidity lock** | locks the deployer's LP by time / volume | `beforeRemove` + `afterSwap` |
-| **Whitelist phase** | gated trading until a deadline | `beforeSwap` + `beforeAdd` |
+<img class="diagram wide" src="diagrams/lifecycle.svg" alt="Each pool callback maps to mechanisms: beforeSwap runs anti-snipe, tax and whitelist; beforeAddLiquidity bootstraps and gates; afterSwap tracks volume; beforeRemoveLiquidity enforces the lock" />
 
-<p class="muted">Tax uses v4's <em>dynamic LP fee</em> — caps at 10%, decays linearly. Anti-snipe window ≤ 1 day.</p>
+<p class="muted">Tax uses v4's <em>dynamic LP fee</em> — caps at 10%, decays linearly. Anti-snipe window ≤ 1 day. Enable any subset, per launch.</p>
 
 Note:
 Four mechanisms, each wired to a specific hook callback. Anti-snipe caps buy size. The tax is a dynamic LP fee — asymmetric buy-versus-sell and it decays to a floor, so it's protective at launch and fades out. Liquidity lock keeps the deployer from rugging, by time and/or by traded volume. And an optional whitelist phase. You pick which ones to enable per launch.
@@ -55,23 +46,20 @@ Four mechanisms, each wired to a specific hook callback. Anti-snipe caps buy siz
 
 ## Governance = *own the NFT*
 
-- The **first LP position IS the governance NFT** — `salt == tokenId`
-- Mutable params can only be **relaxed** — tax down, lock shorter
-- All settings **freeze** when the launch window ends
-- **No admin key** — transfer the NFT to a Safe or a DAO
+<img class="diagram tall" src="diagrams/governance.svg" alt="The first LP position is the governance NFT; the holder can only relax params (hook accepts) while tightening reverts with CanOnlyRelax; the NFT can be transferred to a Safe or DAO; all params freeze when the launch window ends" />
+
+<p class="caption">First LP position = the governance NFT (<code>salt == tokenId</code>). No admin key — transfer it to a Safe or DAO.</p>
 
 Note:
 Who controls a launch? Whoever holds the governance NFT — and that NFT is just the deployer's own liquidity position. There's no owner address, no admin key. And crucially, every change is a one-way ratchet: you can only make things fairer — lower the tax, shorten the lock — never the reverse. After the launch window, it all freezes.
 
 ---
 
-## Architecture — 3 contracts, once per chain
+## Architecture — one atomic launch
 
-- **TokenLaunchHook** — one shared hook; all per-pool state in `mapping(PoolId ⇒ …)`
-- **CampaignWrapper** — launches a campaign in **one atomic tx** (`PositionManager.multicall`)
-- **TokenFactory** — optional ERC-20 cloner
+<img class="diagram wide" src="diagrams/architecture.svg" alt="Sequence: deployer calls CampaignWrapper.launchCampaign, which optionally deploys an ERC-20 via TokenFactory, then PositionManager.multicall initializes the pool and mints; the first mint triggers the hook's beforeAddLiquidity which captures the governance NFT and arms mechanisms; the LP position returns to the deployer as the governance NFT" />
 
-<p class="subtitle">One <strong>mined CREATE2</strong> hook address — permission flags live in the address bits — serves <em>every</em> launch on the chain. Non-upgradeable.</p>
+<p class="caption"><strong>TokenLaunchHook</strong> (one shared, mined-CREATE2 hook · per-pool state in <code>mapping(PoolId⇒…)</code>) · <strong>CampaignWrapper</strong> (atomic launch) · <strong>TokenFactory</strong> (optional cloner). Deployed once per chain, non-upgradeable.</p>
 
 Note:
 Three contracts, deployed once per chain. A single hook — mined to a CREATE2 address that encodes its permission flags — serves every launch. A launch is one atomic transaction: initialize the pool and mint the seed position in a single multicall, with all the module config passed in hookData. Non-upgradeable: a new version is a new deployment, not a proxy.

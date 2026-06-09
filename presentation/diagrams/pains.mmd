@@ -1,0 +1,17 @@
+flowchart LR
+  subgraph PAINS["Campaign pains"]
+    direction TB
+    P1["🤖 Snipers<br/>grab the first block"]:::pain
+    P2["🥪 Sandwich bots<br/>tax every early buyer"]:::pain
+    P3["🪤 Rug pull<br/>deployer yanks LP"]:::pain
+    P4["🎫 No fair access<br/>everyone fights at once"]:::pain
+  end
+  PAINS ==>|"all happen in the POOL"| HOOK["One v4 hook<br/>enforces fairness"]:::live
+  HOOK --> S1["cap buy size"]:::fix
+  HOOK --> S2["decaying buy/sell tax"]:::fix
+  HOOK --> S3["liquidity lock"]:::fix
+  HOOK --> S4["whitelist phase"]:::fix
+  classDef pain fill:#3b0d22,stroke:#ff007a,color:#fecdd3;
+  classDef live fill:#0b3b2e,stroke:#10b981,stroke-width:2px,color:#e5e7eb;
+  classDef fix fill:#064e3b,stroke:#34d399,color:#d1fae5;
+  style PAINS fill:#160a10,stroke:#ff007a,color:#ff7ab0;

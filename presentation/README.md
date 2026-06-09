@@ -11,6 +11,20 @@ A 5-minute pitch video for **TokenLaunchHook Studio**. Structure: **① presenta
 | `slides.md` | The slides, in Reveal markdown. Speaker notes live in `Note:` blocks. |
 | `script.md` | The full English narration, timed in 3 acts, with on-screen cues. |
 | `demo-checklist.md` | Pre-flight checklist for the live launch in Act 3. |
+| `diagrams/*.mmd` | Mermaid sources for the technical diagrams. |
+| `diagrams/*.svg` | Pre-rendered static SVGs embedded in the slides (no runtime Mermaid dep). |
+| `render-diagrams.mjs` | Renders every `*.mmd` → `*.svg` via mermaid.ink (dark theme, bg `#191919`). |
+
+## Diagrams
+
+Slides carry the technical story as **infographics**, not bullet-dupes of the narration. Diagrams are
+authored in Mermaid (`diagrams/*.mmd`) and pre-rendered to **static SVG** so the deck stays a zero-build,
+CDN-only page with no runtime Mermaid dependency. Embed with `<img class="diagram" src="diagrams/x.svg">`
+(modifiers: `wide`, `tall`, `compact`). After editing a `.mmd`, regenerate:
+
+```bash
+node render-diagrams.mjs   # needs network (mermaid.ink); rewrites diagrams/*.svg
+```
 
 ## Run the deck
 

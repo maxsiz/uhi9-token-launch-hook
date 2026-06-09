@@ -1,0 +1,14 @@
+flowchart LR
+  T["Plain ERC-20<br/>untouched · bring your own"]:::token
+  U["Traders & LPs"]:::actor
+  subgraph POOL["Uniswap v4 pool"]
+    HOOK["TokenLaunchHook<br/>runs on every action"]:::live
+  end
+  T -->|"listed in"| POOL
+  U -->|"swap · add · remove"| HOOK
+  HOOK -->|"enforces"| RULES["anti-snipe · tax<br/>lock · whitelist"]:::mech
+  classDef token fill:#1f2937,stroke:#9ca3af,color:#e5e7eb;
+  classDef actor fill:#0f172a,stroke:#60a5fa,color:#dbeafe;
+  classDef live fill:#0b3b2e,stroke:#10b981,stroke-width:2px,color:#e5e7eb;
+  classDef mech fill:#134e4a,stroke:#2dd4bf,color:#ccfbf1;
+  style POOL fill:#0b0f0d,stroke:#10b981,color:#34d399;

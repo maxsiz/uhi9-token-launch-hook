@@ -60,6 +60,19 @@
       .reveal table { font-size: 0.7em; }
       .reveal section img { border: none; box-shadow: none; }
       .reveal .divider { color: var(--uni-pink); font-size: 3em; }
+      /* Rendered Mermaid diagrams (static SVGs from diagrams/, see render-diagrams.mjs). */
+      .reveal .diagram {
+        display: block;
+        margin: 0.45em auto 0.2em;
+        max-width: 94%;
+        max-height: 56vh;
+        width: auto;
+        height: auto;
+      }
+      .reveal .diagram.wide { max-width: 98%; max-height: 44vh; }
+      .reveal .diagram.tall { max-height: 64vh; }
+      .reveal .diagram.compact { max-height: 38vh; }
+      .reveal .caption { color: #9ca3af; font-size: 0.62em; margin-top: 0.2em; }
     </style>
   </head>
   <body>
