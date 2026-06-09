@@ -117,20 +117,6 @@ Note:
 
 ---
 
-## TokenLaunchHook Studio
-
-**Fair launches, enforced by the pool — not the token.**
-
-- One v4 hook · 4 mechanisms · NFT governance · no admin key
-- Non-upgradeable · live on mainnet · 147 tests green
-
-<p class="muted">github.com/maxsiz/uhi9-token-launch-hook · uhi9-token-launch-hook.vercel.app</p>
-
-Note:
-To recap: fairness enforced in the pool, by one Uniswap v4 hook. Four mechanisms, NFT-based governance with no admin key, non-upgradeable, and live on mainnet today. And it's a studio — here's where it goes next.
-
----
-
 ## Roadmap — what's next
 
 - 🎨 **Studio UX** — richer launch wizard, campaign analytics &amp; charts, mobile polish
