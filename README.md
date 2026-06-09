@@ -1,8 +1,19 @@
 # TokenLaunchHook — Coding Spec
 
+[![tests](https://img.shields.io/badge/tests-147%20passing-2ea44f)](https://github.com/maxsiz/uhi9-token-launch-hook/actions/workflows/test.yml)
+[![live studio](https://img.shields.io/badge/live%20studio-online-3b82f6)](https://uhi9-token-launch-hook.vercel.app/)
+[![presentation](https://img.shields.io/badge/presentation-deck-ff007a)](https://iber.dev/uhi9-token-launch-hook)
+![demo video](https://img.shields.io/badge/demo%20video-coming%20soon-9ca3af)
+
 V4 hook attached to a newly launched token's pool. Enforces fair-launch rules (anti-snipe, dynamic LP fee tax, conditional liquidity lock, whitelist phase) without modifying the ERC-20 token contract. Single hook deployment per chain serves all launches.
 
-## Current state  - deep testing & debug
+## Hackathon submission
+
+- 🌐 **Live studio** — <https://uhi9-token-launch-hook.vercel.app/>
+- 🖥️ **Presentation** — <https://iber.dev/uhi9-token-launch-hook>
+- 🎬 **Demo video** — _coming soon_
+
+**147 tests green** — unit · fuzz · mainnet-fork. Live on **Ethereum**, **Unichain** & **Unichain Sepolia**. See [`web/`](web/) for the Studio dApp and [`presentation/`](presentation/) for the deck.
 
 ## Build & test
 
