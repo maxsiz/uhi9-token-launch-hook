@@ -14,14 +14,15 @@ const MERMAID = {
   theme: "dark",
   themeVariables: {
     fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-    fontSize: "15px",
+    fontSize: "24px", // larger so text stays legible after the SVG is scaled to fit a slide
     lineColor: "#34d399",
     primaryColor: "#0b3b2e",
     primaryBorderColor: "#10b981",
     primaryTextColor: "#e5e7eb",
   },
-  flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true },
-  sequence: { useMaxWidth: true },
+  flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: true, padding: 14 },
+  // Sequence diagrams have their own font knobs — bump them all (the architecture slide was tiny).
+  sequence: { actorFontSize: 20, messageFontSize: 19, noteFontSize: 18, actorMargin: 55, useMaxWidth: true },
 };
 
 const files = readdirSync(DIR).filter((f) => f.endsWith(".mmd")).sort();

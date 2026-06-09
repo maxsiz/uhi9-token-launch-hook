@@ -19,5 +19,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "comment": "e2e self-test scripts + specs are bundled/run by esbuild & Playwright (validated by running), not by tsc — keep them out of `next build`'s type-check so viem chain-variance types don't gate the production deploy.",
+  "exclude": ["node_modules", "scripts/e2e-autolaunch.ts", "scripts/e2e-mechanisms.ts", "e2e"]
 }

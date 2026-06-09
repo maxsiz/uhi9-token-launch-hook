@@ -382,6 +382,10 @@ windows, then drives real swaps + governance to exercise each mechanism. Every o
 is linked to the block explorer (${EXPLORER}). Negative checks are sent as **real reverting transactions**
 so the guard is provable on-chain.
 
+> ⭐ **The launch row (the one whose test starts with "Launch") is the headline transaction: atomic token
+> + position creation** — the single tx that deploys the token *and* opens the seeded pool with all
+> modules armed (gov-NFT captured in the same call). It carries the most events.
+
 `;
   for (const m of meta) {
     const c = m.cfg;
@@ -389,7 +393,13 @@ so the guard is provable on-chain.
     md += `| # | Test — what the transaction verifies | Transaction |\n|---|---|---|\n`;
     const rows = LEDGER.filter((r) => r.campaign === m.idx);
     rows.forEach((r, i) => {
-      md += `| ${i + 1} | ${r.verifies}${r.outcome.startsWith("reverted") ? " — **reverts as expected**" : ""} | ${link(r.hash)} |\n`;
+      // ⭐ Highlight the atomic launch (token + position creation) row — the headline tx.
+      const isLaunch = r.verifies.startsWith("Launch");
+      const verifies = isLaunch ? `⭐ **ATOMIC TOKEN + POSITION CREATION** — ${r.verifies}` : r.verifies;
+      const reverts = r.outcome.startsWith("reverted") ? " — **reverts as expected**" : "";
+      const num = isLaunch ? "**4**" : `${i + 1}`;
+      const tx = isLaunch ? `**${link(r.hash)}**` : link(r.hash);
+      md += `| ${num} | ${verifies}${reverts} | ${tx} |\n`;
     });
     md += `\n`;
   }

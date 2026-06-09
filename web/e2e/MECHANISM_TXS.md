@@ -6,6 +6,10 @@ windows, then drives real swaps + governance to exercise each mechanism. Every o
 is linked to the block explorer (https://sepolia.uniscan.xyz). Negative checks are sent as **real reverting transactions**
 so the guard is provable on-chain.
 
+> ⭐ **Row 4 in each table is the headline transaction: atomic token + position creation** — the single tx
+> that deploys the token *and* opens the seeded pool with all modules armed (the gov-NFT captured in the
+> same call). It carries the most events (22).
+
 ## Campaign #1 — AND-lock (buy 5% / sell 8% → base 1%, anti-snipe cap 0.01 pair)
 
 PoolId `0x795199caef7664ee12e8754d4887ec9b8a78ce1bffb8287abf6ac1b47d006d6e`
@@ -15,7 +19,7 @@ PoolId `0x795199caef7664ee12e8754d4887ec9b8a78ce1bffb8287abf6ac1b47d006d6e`
 | 1 | Deploy the ERC-20 counter-asset (pair token) via TokenFactory | [0x37d4549b…](https://sepolia.uniscan.xyz/tx/0x37d4549b309c7aec6ba06bdacb4a794a5a2c3356cf008de0171a401e3385078f) |
 | 2 | Approve pair token → Permit2 (ERC-20 leg of the Permit2 approval chain) | [0xdec9f6a6…](https://sepolia.uniscan.xyz/tx/0xdec9f6a6b46b340d0beb9aa1a52cacad2210e7779fd686c80b5063083ce44303) |
 | 3 | Permit2 → grant pair token allowance to the Universal Router (router leg) | [0x59ad16db…](https://sepolia.uniscan.xyz/tx/0x59ad16db533767bb6f947f6f49ee9f5fb8a543a325d35e8b294794d84f93574e) |
-| 4 | Launch the campaign — deploys the token + opens the pool with ALL modules ON (anti-snipe, 5/8% tax, AND-lock, whitelist) in one tx | [0xf96af502…](https://sepolia.uniscan.xyz/tx/0xf96af502a01754c02caee0ab22ebc1613e65bda6a890c688e9d59dc579324778) |
+| **4** | ⭐ **ATOMIC TOKEN + POSITION CREATION** — Launch the campaign: deploys the token + opens the pool with ALL modules ON (anti-snipe, 5/8% tax, AND-lock, whitelist) in **one tx** | **[0xf96af502…](https://sepolia.uniscan.xyz/tx/0xf96af502a01754c02caee0ab22ebc1613e65bda6a890c688e9d59dc579324778)** |
 | 5 | Whitelist phase REJECTS a buy from a non-whitelisted address (reverts NotWhitelisted) — **reverts as expected** | [0xc9a9125f…](https://sepolia.uniscan.xyz/tx/0xc9a9125fb603d16b7ce6bae9e0457a8b0c5eb52cc4ab7147c09a372a5c4f087d) |
 | 6 | Governance (gov-NFT owner) adds the launcher to the whitelist | [0x760cc14b…](https://sepolia.uniscan.xyz/tx/0x760cc14b1dda04e69028cdbf28155329b3ef6ceadb916a4b4d0ed8c5fc985c9b) |
 | 7 | Anti-snipe REJECTS an oversized buy (> 0.01 pair cap) during the window (reverts BuyTooLarge) — **reverts as expected** | [0x3a7dc93a…](https://sepolia.uniscan.xyz/tx/0x3a7dc93a274bfb979f5295874fc91d598fd5cb4f2ea7e11c635de800b1c22e58) |
@@ -34,7 +38,7 @@ PoolId `0x08193247f0f045f5a96d0f24056ea62cea3d4d84a0e2285ce81dfc72474ef808`
 | 1 | Deploy the ERC-20 counter-asset (pair token) via TokenFactory | [0xdc5a5189…](https://sepolia.uniscan.xyz/tx/0xdc5a51892ceeeb525220bacacb27b5bf949e4915fbc16577ff780e997a2913ae) |
 | 2 | Approve pair token → Permit2 (ERC-20 leg of the Permit2 approval chain) | [0x9f588d6e…](https://sepolia.uniscan.xyz/tx/0x9f588d6e5b99b4dd036a8ea1b8038e9186558352dc10ba9ebe97d3aa9ac8573d) |
 | 3 | Permit2 → grant pair token allowance to the Universal Router (router leg) | [0xf6984e31…](https://sepolia.uniscan.xyz/tx/0xf6984e316b3521500d37b7ea72cdc2b408508116c8a1087d6a5daa67eda934e3) |
-| 4 | Launch the campaign — deploys the token + opens the pool with ALL modules ON (anti-snipe, 3/6% tax, OR-lock, whitelist) in one tx | [0x345490c0…](https://sepolia.uniscan.xyz/tx/0x345490c06291a22934d2935b9553b3dac555d80b7f651133913f4eb616349f99) |
+| **4** | ⭐ **ATOMIC TOKEN + POSITION CREATION** — Launch the campaign: deploys the token + opens the pool with ALL modules ON (anti-snipe, 3/6% tax, OR-lock, whitelist) in **one tx** | **[0x345490c0…](https://sepolia.uniscan.xyz/tx/0x345490c06291a22934d2935b9553b3dac555d80b7f651133913f4eb616349f99)** |
 | 5 | Whitelist phase REJECTS a buy from a non-whitelisted address (reverts NotWhitelisted) — **reverts as expected** | [0x185663b7…](https://sepolia.uniscan.xyz/tx/0x185663b7b9bf529df00273b92232a8c4f89b4b8e9c25a3beaae9177c11da8ffe) |
 | 6 | Governance (gov-NFT owner) adds the launcher to the whitelist | [0xcbbba95f…](https://sepolia.uniscan.xyz/tx/0xcbbba95f16ed9d82ae37a399a8a2decd24915b80613879c93c44cb841b0be1be) |
 | 7 | Anti-snipe REJECTS an oversized buy (> 0.02 pair cap) during the window (reverts BuyTooLarge) — **reverts as expected** | [0xf74bd7c9…](https://sepolia.uniscan.xyz/tx/0xf74bd7c93d68981efa52279810e79423ee83a7906f3ee2a4327ca0251a3dd5c6) |

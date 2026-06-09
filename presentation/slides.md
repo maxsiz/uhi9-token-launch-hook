@@ -4,7 +4,7 @@
 
 <img class="diagram compact" src="diagrams/studio.svg" alt="Studio is a hook platform: TokenLaunchHook is one shipped example with pluggable mechanisms; more hooks can plug in" />
 
-<p class="muted"><span class="pink">This is one example hook</span> — pluggable hooks &amp; mechanisms · four fair-launch mechanisms · live on Ethereum, Unichain &amp; Unichain Sepolia</p>
+<p class="muted"><span class="pink">This is one example hook</span> · live on Ethereum · Unichain · Unichain Sepolia</p>
 
 Note:
 Hi — this is TokenLaunchHook Studio. Think of it as a studio for launch hooks: the framework is a single shared v4 hook plus pluggable mechanisms, and what you'll see today is *one* hook — a fair-launch hook — built on it as the example. Other hooks and other mechanisms can plug into the same studio. And it does all this as a Uniswap v4 hook, without ever changing the token contract. Let me show you the problem it solves first.
@@ -14,8 +14,6 @@ Hi — this is TokenLaunchHook Studio. Think of it as a studio for launch hooks:
 ## A fix for the pains every campaign hits
 
 <img class="diagram wide" src="diagrams/pains.svg" alt="Snipers, sandwich bots, rug pulls and unfair access all happen in the pool; one v4 hook answers each with a cap on buy size, a decaying tax, a liquidity lock and a whitelist phase" />
-
-<p class="muted">Today that fairness lives in <em>custom ERC-20 code</em> — extra surface, extra audits — or it doesn't exist. Every pain happens in the pool, so the fix belongs in the pool.</p>
 
 Note:
 Every launch is a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax every early buyer. Teams pull the liquidity. And nobody gets fair access — it's a free-for-all. These are the real pains of running a campaign, and this hook is built to answer each one — directly. The usual alternative is to bake anti-bot logic into the ERC-20 itself, which means more code to audit and a token that's hard to integrate. Our point: every one of these pains happens in the pool, so the fix should live in the pool — not in the token.
@@ -83,19 +81,17 @@ One more thing we cared about: legibility. Every button in the app is badged wit
 
 ## Status — and it's all on-chain
 
-- ✅ **135 passing tests** — unit, fuzz, **mainnet-fork**
-- 🚀 Live on **Ethereum**, **Unichain**, **Unichain Sepolia** · studio on Vercel
+- ✅ **147 passing tests** — unit · fuzz · **mainnet-fork**
+- 🧩 **4 core contracts** (hook · wrapper · factory · **lens**) **+ 5 modules**
+- 🤖 **Headless self-test** — real launch + swaps from a *headless browser*, every mechanism on-chain
+- 🚀 Live on **Ethereum · Unichain · Unichain Sepolia** · studio on Vercel
 
-**Proof, not slides:**
+**All-modules launch** — [0xf96a…4778 ↗](https://sepolia.uniscan.xyz/tx/0xf96af502a01754c02caee0ab22ebc1613e65bda6a890c688e9d59dc579324778) <span class="muted">· <strong>22 events</strong>: pool + seed mint + gov-NFT + all modules armed</span>
 
-**Atomic launch** — [sepolia.uniscan.xyz · 0x0d02…fab5d ↗](https://sepolia.uniscan.xyz/tx/0x0d026ce58f40be357055c0f997ed87cb6cf82b6ce85d2ad04093be72302fab5d)
-<br><span class="muted">one tx — pool init + seed mint + governance NFT captured + mechanisms armed</span>
-
-**Governance** — [sepolia.uniscan.xyz · 0xc9b1…5b94ac ↗](https://sepolia.uniscan.xyz/tx/0xc9b1bcbc160f58705d6361b559aab69982b3110115ba20df03c318dbbc5b94ac)
-<br><span class="muted">whitelist update — authorized only by holding the LP-NFT · no admin key</span>
+**Governance** — [0x760c…85c9b ↗](https://sepolia.uniscan.xyz/tx/0x760cc14b1dda04e69028cdbf28155329b3ef6ceadb916a4b4d0ed8c5fc985c9b) <span class="muted">· whitelist update · NFT-only, no admin key</span>
 
 Note:
-And this isn't mockups. 135 tests pass — including fuzz tests on the tax-decay math and fork tests against live Uniswap v4. It's live on three chains including Ethereum mainnet. Here are two real, public transactions: the atomic launch — one transaction that initializes the pool, mints the seed liquidity, and captures the governance NFT — and a governance action, authorized purely by holding that NFT. Verify them yourself. Now let me prove it live: tests, then a launch.
+And this isn't mockups. 147 tests pass — including fuzz tests on the tax-decay math and fork tests against live Uniswap v4. Four core contracts plus five mechanism modules, and a headless self-test that drives a real launch and swaps from a headless browser through an injected wallet, asserting every mechanism on-chain. It's live on three chains including Ethereum mainnet. Here are two real, public transactions: an all-modules launch — one transaction that initializes the pool, mints the seed liquidity, captures the governance NFT, and arms every mechanism, twenty-two events in one tx — and a governance action authorized purely by holding that NFT. Verify them yourself. Now let me prove it live: tests, then a launch.
 
 ---
 
@@ -126,7 +122,7 @@ Note:
 **Fair launches, enforced by the pool — not the token.**
 
 - One v4 hook · 4 mechanisms · NFT governance · no admin key
-- Non-upgradeable · live on mainnet · 135 tests green
+- Non-upgradeable · live on mainnet · 147 tests green
 
 <p class="muted">github.com/maxsiz/uhi9-token-launch-hook · uhi9-token-launch-hook.vercel.app</p>
 
