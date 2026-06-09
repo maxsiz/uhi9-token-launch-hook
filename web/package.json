@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "gen:contracts": "tsx scripts/gen-contracts.ts"
+    "gen:contracts": "tsx scripts/gen-contracts.ts",
+    "e2e:autolaunch": "esbuild scripts/e2e-autolaunch.ts --bundle --platform=node --format=cjs --tsconfig=tsconfig.json --outfile=.e2e/out.cjs && set -a && . ./.env.local && set +a && node .e2e/out.cjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",
@@ -30,6 +31,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
+    "esbuild": "^0.28.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "tsx": "^4.16.2",
