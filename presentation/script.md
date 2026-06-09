@@ -10,14 +10,10 @@ Timecodes are cumulative (when each part should *start*). Slide numbers match `s
 
 **[00:00 · Slide 1 — Title / Studio]**
 Hi. This is **TokenLaunchHook Studio** — think of it as a *studio for Uniswap v4 launch hooks*. The
-framework is one shared hook plus pluggable mechanisms; what you'll see today is **one** hook built on it
-— a fair-launch hook — as the example. And it never touches the token contract.
+framework is one shared hook plus pluggable mechanisms; what you'll see today is **one** hook built on it — a fair-launch hook — as the example. It does not require changes to the token contract.
 
 **[00:18 · Slide 2 — The pains]**
-Every token launch is a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax
-every early buyer. Teams pull the liquidity. And nobody gets fair access. This hook answers each of those
-pains directly. The usual alternative is to bake the logic into the ERC-20 itself — more code, more
-audits — but every one of these pains happens in the *pool*, so the fix belongs in the pool.
+As you remember from past bull run every token launch was a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax every early buyer. Teams pull the liquidity. And nobody gets fair access. This hook answers each of those pains directly. The usual alternative was to bake the logic into the ERC-20 itself — more code, more audits — but every one of these pains happens in the *pool*, so the fix should belongs in the pool as well.
 
 **[00:42 · Slide 3 — Insight]**
 v4 hooks let you run code on every pool action. So we wrote one hook that enforces the launch rules on
@@ -30,14 +26,10 @@ protects at launch then fades. A **liquidity lock** stops the rug, by time and/o
 an optional **whitelist phase**. You enable whichever you want, per launch.
 
 **[01:26 · Slide 5 — Governance]**
-Who controls a launch? Whoever holds the **governance NFT** — which is just the deployer's own liquidity
-position. No owner address, no admin key. Every change is a one-way ratchet: you can only make it
-*fairer* — lower the tax, shorten the lock — never the reverse. When the launch window ends, it freezes.
+Who controls a launch? Whoever holds the **governance NFT** — which is just the deployer's own liquidity position. No owner address, no admin key. Every change is a one-way ratchet: you can only make it *fairer* — lower the tax, shorten the lock — never the reverse. When the launch window ends, all mechanisms are disabled and the pool continues to operate in normal swap mode.
 
 **[01:48 · Slide 6 — Architecture]**
-Under the hood: three contracts, deployed once per chain. One mined hook address serves every launch, and
-a launch is a single **atomic transaction** — pool init plus the seed mint in one multicall, with all the
-module config passed in hookData.
+Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData.
 
 **[02:04 · Slide 7 — Wallets, injected only]**
 On the front end, the studio talks to wallets through **one** thing — an *injected* provider: the
