@@ -24,7 +24,9 @@ import { CampaignWrapperAbi, CampaignWrapperAutoAbi, Erc20Abi, TokenFactoryAbi }
 import { prepareAutoLaunch, type LaunchFormInput } from "@/lib/campaign/launch";
 import { buildPermitData } from "@/lib/campaign/permit2";
 
-const RPC = "https://sepolia.unichain.org";
+// Single consistent backend (not the official load-balancer) — avoids cross-node nonce disagreement
+// and post-write propagation lag that intermittently break sequential txs.
+const RPC = "https://unichain-sepolia.drpc.org";
 const EXPLORER = "https://sepolia.uniscan.xyz";
 const CHAIN_ID = unichainSepolia.id; // 1301
 
@@ -74,9 +76,9 @@ async function main() {
   // The public RPC is load-balanced with uneven head lag, so per-tx getTransactionCount races (a node
   // that missed the last block reports a stale nonce → "nonce too low"). Track the nonce locally instead:
   // seed once, pin it on every write, bump on success, and resync from the chain only if a node rejects us.
-  let nonce = Number(await withRetry("seed nonce", () => pub.getTransactionCount({ address: account.address, blockTag: "pending" })));
+  let nonce = Number(await withRetry("seed nonce", () => pub.getTransactionCount({ address: account.address, blockTag: "latest" })));
   async function send(req: { [k: string]: unknown }): Promise<{ hash: Hex; receipt: Awaited<ReturnType<typeof pub.waitForTransactionReceipt>> }> {
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 12; i++) {
       try {
         const hash = (await wallet.writeContract({ ...(req as Parameters<typeof wallet.writeContract>[0]), nonce })) as Hex;
         const receipt = await pub.waitForTransactionReceipt({ hash });
@@ -84,12 +86,11 @@ async function main() {
         return { hash, receipt };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (/nonce too low|already known|replacement transaction underpriced/i.test(msg)) {
-          nonce = Math.max(nonce + 1, Number(await withRetry("resync nonce", () => pub.getTransactionCount({ address: account.address, blockTag: "pending" }))));
-          await sleep(1500);
-          continue;
-        }
-        throw e;
+        const next = msg.match(/next nonce (\d+)/i);
+        if (next) nonce = Number(next[1]);
+        else if (/nonce too low|already known|replacement transaction underpriced/i.test(msg)) nonce++;
+        else throw e;
+        await sleep(1500);
       }
     }
     throw new Error("send: exhausted nonce retries");

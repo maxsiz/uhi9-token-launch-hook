@@ -25,3 +25,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 /.e2e/
+
+# playwright (Harness B)
+/test-results/
+/playwright-report/
+/playwright/.cache/
