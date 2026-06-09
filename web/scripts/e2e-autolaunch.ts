@@ -28,6 +28,35 @@ const RPC = "https://sepolia.unichain.org";
 const EXPLORER = "https://sepolia.uniscan.xyz";
 const CHAIN_ID = unichainSepolia.id; // 1301
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The public RPC is load-balanced across nodes with uneven head lag: a tx receipt can come back from
+ * one node while a follow-up eth_call lands on another that hasn't applied the block yet — surfacing as
+ * "returned no data (0x)" / missing code. Retry reads a few times to ride out the propagation gap.
+ */
+async function withRetry<T>(label: string, fn: () => Promise<T>, tries = 6): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await sleep(1500);
+    }
+  }
+  throw new Error(`${label} failed after ${tries} tries: ${last instanceof Error ? last.message : last}`);
+}
+
+/** Poll until the address actually has code on the node we hit — guards against post-create state lag. */
+async function waitForCode(pub: ReturnType<typeof createPublicClient>, address: Address) {
+  await withRetry(`code@${address}`, async () => {
+    const code = await pub.getCode({ address });
+    if (!code || code === "0x") throw new Error("no code yet");
+    return code;
+  });
+}
+
 async function main() {
   const pk = (process.env.TEST_PK_1 ?? "") as Hex;
   if (!/^0x[0-9a-fA-F]{64}$/.test(pk)) throw new Error("TEST_PK_1 missing/invalid — source web/.env.local");
@@ -42,12 +71,37 @@ async function main() {
   if (bal === 0n) throw new Error(`fund ${account.address} with Unichain Sepolia ETH first`);
   console.log(`wrapper  ${wrapper}`);
 
+  // The public RPC is load-balanced with uneven head lag, so per-tx getTransactionCount races (a node
+  // that missed the last block reports a stale nonce → "nonce too low"). Track the nonce locally instead:
+  // seed once, pin it on every write, bump on success, and resync from the chain only if a node rejects us.
+  let nonce = Number(await withRetry("seed nonce", () => pub.getTransactionCount({ address: account.address, blockTag: "pending" })));
+  async function send(req: { [k: string]: unknown }): Promise<{ hash: Hex; receipt: Awaited<ReturnType<typeof pub.waitForTransactionReceipt>> }> {
+    for (let i = 0; i < 6; i++) {
+      try {
+        const hash = (await wallet.writeContract({ ...(req as Parameters<typeof wallet.writeContract>[0]), nonce })) as Hex;
+        const receipt = await pub.waitForTransactionReceipt({ hash });
+        nonce++;
+        return { hash, receipt };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (/nonce too low|already known|replacement transaction underpriced/i.test(msg)) {
+          nonce = Math.max(nonce + 1, Number(await withRetry("resync nonce", () => pub.getTransactionCount({ address: account.address, blockTag: "pending" }))));
+          await sleep(1500);
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw new Error("send: exhausted nonce retries");
+  }
+
   // 1) Deploy a throwaway ERC-20 pair via the live factory, minted to the deployer.
   console.log("\n[1] deploying pair token via factory…");
   const pairCfg = { name: "E2E Pair", symbol: "E2EP", totalSupply: parseUnits("1000000", 18) };
   const dep = await pub.simulateContract({ account, address: factory, abi: TokenFactoryAbi, functionName: "deployToken", args: [pairCfg, account.address] });
   const pair = dep.result as Address;
-  await pub.waitForTransactionReceipt({ hash: await wallet.writeContract(dep.request) });
+  await send(dep.request);
+  await waitForCode(pub, pair); // ride out RPC head-lag before reading the fresh contract
   console.log(`    pair ${pair}  ${EXPLORER}/address/${pair}`);
 
   // 2) Build the auto-priced launch via the real frontend lib (no priceMath; only the pair is pulled).
@@ -70,11 +124,14 @@ async function main() {
   const { autoParams, permitTokens } = prepareAutoLaunch(input, Math.floor(Date.now() / 1000));
 
   // 3) Pair → Permit2 (on-chain ERC-20 approve, once).
-  const allowance = (await pub.readContract({ address: pair, abi: Erc20Abi, functionName: "allowance", args: [account.address, PERMIT2] })) as bigint;
+  const allowance = await withRetry(
+    "allowance",
+    () => pub.readContract({ address: pair, abi: Erc20Abi, functionName: "allowance", args: [account.address, PERMIT2] }) as Promise<bigint>,
+  );
   if (allowance < permitTokens[0].amount) {
     console.log("[2] approving pair → Permit2…");
     const a = await pub.simulateContract({ account, address: pair, abi: Erc20Abi, functionName: "approve", args: [PERMIT2, maxUint256] });
-    await pub.waitForTransactionReceipt({ hash: await wallet.writeContract(a.request) });
+    await send(a.request);
   }
 
   // 4) Sign the Permit2 batch (gasless EIP-712) for the pair.
@@ -91,10 +148,11 @@ async function main() {
 
   // 5) Simulate + send the auto-priced launch (one tx; token deployed + priced on-chain in the call).
   console.log("[4] simulating launchCampaign(auto)…");
-  const { request } = await pub.simulateContract({ account, address: wrapper, abi: CampaignWrapperAutoAbi, functionName: "launchCampaign", args: [autoParams, permitData] });
-  const hash = await wallet.writeContract(request);
+  const { request } = await withRetry("simulate launch", () =>
+    pub.simulateContract({ account, address: wrapper, abi: CampaignWrapperAutoAbi, functionName: "launchCampaign", args: [autoParams, permitData] }),
+  );
+  const { hash, receipt } = await send(request);
   console.log(`    launch tx ${EXPLORER}/tx/${hash}`);
-  const receipt = await pub.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("launch reverted");
 
   const events = parseEventLogs({ abi: CampaignWrapperAbi, logs: receipt.logs, eventName: "CampaignLaunched" });
