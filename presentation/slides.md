@@ -149,4 +149,17 @@ Note:
 <p class="muted">github.com/maxsiz/uhi9-token-launch-hook · uhi9-token-launch-hook.vercel.app</p>
 
 Note:
-To recap: fairness enforced in the pool, by one Uniswap v4 hook. Four mechanisms, NFT-based governance with no admin key, non-upgradeable, and live on mainnet today. Thanks for watching.
+To recap: fairness enforced in the pool, by one Uniswap v4 hook. Four mechanisms, NFT-based governance with no admin key, non-upgradeable, and live on mainnet today. And it's a studio — here's where it goes next.
+
+---
+
+## Roadmap — what's next
+
+- 🎨 **Studio UX** — richer launch wizard, campaign analytics &amp; charts, mobile polish
+- 🧩 **More hooks** — vesting · LBPs · lockers… <em>TokenLaunchHook is hook #1 in the studio</em>
+- 💸 **Protocol fee** — opt-in service fee skimmed from campaign revenue (a slice of the tax / LP fees) to sustain the studio
+
+<p class="muted">Fair launches, enforced by the pool — not the token. · github.com/maxsiz/uhi9-token-launch-hook · uhi9-token-launch-hook.vercel.app</p>
+
+Note:
+And it's a platform, so here's the roadmap. First, the studio experience — a richer launch wizard, campaign analytics, mobile polish. Second, more hooks — vesting, LBPs, lockers; TokenLaunchHook is just hook number one. And third, an opt-in protocol fee, skimmed from campaign revenue — a slice of the tax or LP fees — to sustain the studio. Thanks for watching.

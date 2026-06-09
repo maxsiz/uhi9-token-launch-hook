@@ -1,8 +1,8 @@
 # Narration script — 5-minute hackathon video
 
 **Total target: 5:00.** Read at ~150 wpm. Cues in `[brackets]` are for the editor / screen, not read aloud.
-Timecodes are cumulative (when each part should *start*). Slide numbers match `slides.md` (13 slides:
-10 presentation + terminal + browser + recap).
+Timecodes are cumulative (when each part should *start*). Slide numbers match `slides.md` (14 slides:
+10 presentation + terminal + browser + recap + roadmap).
 
 ---
 
@@ -104,13 +104,17 @@ The sniper protection is real, on-chain.
 
 ---
 
-## CLOSE · ~0:10  `[Slide 13 — recap]`
+## CLOSE · ~0:18  `[Slides 13–14 — recap + roadmap]`
 
-**[04:50]**
+**[04:48 · Slide 13 — recap]**
 That's TokenLaunchHook Studio: fairness enforced by the pool, not the token. One v4 hook, NFT governance,
-no admin key, non-upgradeable — and live on mainnet today. Thanks for watching.
+no admin key, non-upgradeable — and live on mainnet today.
 
-**[05:00 · end]**
+**[04:58 · Slide 14 — roadmap]**
+And it's a studio, so here's where it goes: a richer studio UI, more hooks — vesting, LBPs, lockers — and
+an opt-in **protocol fee** taken from campaign revenue to sustain it. Thanks for watching.
+
+**[05:08 · end]**
 
 ---
 
