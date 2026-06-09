@@ -64,6 +64,28 @@ Three contracts, deployed once per chain. A single hook — mined to a CREATE2 a
 
 ---
 
+## Talking to wallets — *injected only*
+
+<img class="diagram wide" src="diagrams/wallet-flow.svg" alt="Sequence: user clicks Launch; the studio asks wagmi to signTypedData (Permit2), which calls eth_signTypedData_v4 on the injected window.ethereum provider, the wallet prompts to sign and returns a gasless signature; then writeContract calls eth_sendTransaction, the wallet prompts to confirm and returns a tx hash; the private key never leaves the wallet" />
+
+<p class="caption"><strong>wagmi + viem</strong> · <code>injected()</code> only (MetaMask / Rabby via <strong>EIP-6963</strong>) — no WalletConnect, no projectId. The key never leaves the wallet; the app only sends EIP-1193 requests.</p>
+
+Note:
+How does the studio talk to a wallet? Only through an injected provider — the window.ethereum object a browser extension like MetaMask or Rabby puts on the page, discovered via EIP-6963. No WalletConnect, no projectId. A launch is two wallet interactions: wagmi asks the provider to sign the Permit2 batch — a gasless EIP-712 signature — then to send the launch transaction. The private key never leaves the wallet; we only ever send EIP-1193 requests. The same shape is what our headless self-test injects to drive launches without an extension.
+
+---
+
+## Reads via RPC · writes via the wallet
+
+<img class="diagram" src="diagrams/reads-vs-writes.svg" alt="The studio splits traffic: reads (balances, quotes, view calls) go through our RPC transports — same-origin /api/rpc proxy, then env RPC, then public fallback — to the chain; writes and signatures go through the injected wallet via eth_sendTransaction and eth_signTypedData_v4" />
+
+<p class="caption">Reads go through our own RPC transports (<code>/api/rpc</code> proxy → env → public fallback); only <strong>signatures &amp; transactions</strong> go through the wallet — so the UI works even before you connect.</p>
+
+Note:
+One deliberate split: reads and writes take different paths. Every read — balances, quotes, view calls — goes through our own RPC transports: a same-origin proxy first, then an env RPC, then a public fallback. That means stable reads, no CORS, and a UI that works even before a wallet is connected. Only the things that actually need a key — signatures and transactions — go through the injected wallet. It keeps the app fast and the trust boundary clear.
+
+---
+
 ## It's transparent by design
 
 The studio shows **which hook callback fires** for every action.

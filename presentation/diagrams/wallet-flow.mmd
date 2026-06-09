@@ -1,0 +1,17 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant A as Studio (React)
+  participant W as wagmi + viem
+  participant P as Injected provider<br/>window.ethereum
+  participant K as Wallet · MetaMask/Rabby
+  U->>A: click "Launch"
+  A->>W: signTypedDataAsync — Permit2 batch
+  W->>P: eth_signTypedData_v4
+  P->>K: prompt — Sign
+  K-->>A: signature (gasless)
+  A->>W: writeContractAsync — launchCampaign
+  W->>P: eth_sendTransaction
+  P->>K: prompt — Confirm
+  K-->>A: tx hash
+  Note over P,K: the private key never leaves the wallet
