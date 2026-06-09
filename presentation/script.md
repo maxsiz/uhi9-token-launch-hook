@@ -1,12 +1,12 @@
 # Narration script — 5-minute hackathon video
 
 **Total target: 5:00.** Read at ~150 wpm. Cues in `[brackets]` are for the editor / screen, not read aloud.
-Timecodes are cumulative (when each part should *start*). Slide numbers match `slides.md` (14 slides:
-10 presentation + terminal + browser + recap + roadmap).
+Timecodes are cumulative (when each part should *start*). Slide numbers match `slides.md` (12 slides:
+8 presentation + terminal + browser + recap + roadmap).
 
 ---
 
-## ACT 1 — Presentation · ~2:50  `[screen: Reveal deck, fullscreen]`
+## ACT 1 — Presentation · ~2:30  `[screen: Reveal deck, fullscreen]`
 
 **[00:00 · Slide 1 — Title / Studio]**
 Hi. This is **TokenLaunchHook Studio** — think of it as a *studio for Uniswap v4 launch hooks*. The
@@ -31,21 +31,12 @@ Who controls a launch? Whoever holds the **governance NFT** — which is just th
 **[01:48 · Slide 6 — Architecture]**
 Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData..
 
-**[02:04 · Slide 7 — Wallets, injected only]**
-On the front end, the studio talks to wallets through **one** thing — an *injected* provider: the
-`window.ethereum` a MetaMask or Rabby puts on the page, discovered via EIP-6963. No WalletConnect. A
-launch is two wallet steps — sign the gasless Permit2 batch, then send the transaction — and the private
-key never leaves the wallet.
+**[02:04 · Slide 7 — Not just a launcher]**
+And the front end isn't only a launcher — it's a runnable demo of the hook. Every control is badged with
+the v4-hook callback it fires, and after each transaction we trace exactly what the hook did. So you watch
+the mechanisms — anti-snipe, tax, lock, whitelist — fire on-chain, not just trust them.
 
-**[02:18 · Slide 8 — Reads vs writes]**
-And reads and writes take different paths: every read goes through our own RPC proxy, only signatures and
-transactions go through the wallet — so the UI works even before you connect.
-
-**[02:30 · Slide 9 — Transparent by design]**
-We also made it legible: every control is badged with the hook callback it fires, and after each
-transaction we trace exactly what the hook did. You see the mechanism, not just trust it.
-
-**[02:40 · Slide 10 — Status & on-chain proof]**
+**[02:18 · Slide 8 — Status & on-chain proof]**
 And this is real. **147 tests pass** — fuzz tests on the tax-decay math, fork tests against the live
 Uniswap v4 contracts — four core contracts plus five mechanism modules, and a **headless self-test** that
 drives a real launch and swaps from a headless browser through an injected wallet, asserting every
@@ -57,61 +48,60 @@ by holding the NFT.
 
 ## ACT 2 — Green tests · ~0:40  `[switch to terminal]`
 
-**[02:55 · Slide 11 → terminal]**
+**[02:35 · Slide 9 → terminal]**
 But does it hold up? `[run: forge test -vvv]`
 
-**[03:00]**
+**[02:40]**
 This is the full suite — **147 tests, all green.** Unit tests for each mechanism, **fuzz tests** that
 prove the tax-decay math stays within bounds and only ever decreases, and **mainnet-fork tests** that run
 against the live Uniswap v4 contracts. `[let the green summary sit on screen for a beat]`
 
 ---
 
-## ACT 3 — Live demo · ~1:25  `[switch to browser: uhi9-token-launch-hook.vercel.app]`
+## ACT 3 — Live demo · ~1:35  `[switch to browser: uhi9-token-launch-hook.vercel.app]`
 
-**[03:35 · Slide 12 → landing / network selector]**
+**[03:20 · Slide 10 → landing / network selector]**
 Here's the live studio. Up top, the network selector — we're on three chains. I'll switch to **Unichain
 Sepolia** for the demo. `[pick Unichain Sepolia]`
 
-**[03:45 · /launch]**
+**[03:30 · /launch]**
 Let's launch a token. The wizard deploys a fresh ERC-20 from the factory, pairs it, and sets the price
 from the seed amounts. `[fill token + pair + seed]` Now the mechanisms — I'll turn on anti-snipe and the
 buy/sell tax; each shows the **hook callback** it will run. `[enable anti-snipe + tax]` Review shows the
 price and the exact mint, and we sign — from a plain wallet, because the hook's anti-sandwich check needs
 `tx.origin == msg.sender`. `[sign in Rabby]`
 
-**[04:10 · post-launch trace]**
+**[03:55 · post-launch trace]**
 Done — one transaction. And here's the **call trace**: the hook fired `beforeAddLiquidity`, captured the
 governance NFT, and armed the mechanisms.
 
-**[04:22 · /governance]**
+**[04:07 · /governance]**
 On the Governance page it discovers my campaign from my wallet's positions — live hook state read
 straight from chain. As the NFT holder I can **relax** a parameter — lower the tax. `[lower tax → sign]`
 One-way only; the hook rejects anything that isn't a relaxation.
 
-**[04:40 · /swap]**
+**[04:25 · /swap]**
 And trading. A normal buy goes through with the current tax applied. `[do a small buy]` But a buy bigger
 than the anti-snipe cap — `[enter oversized amount]` — the hook **reverts**, decoded as *buy too large*.
 The sniper protection is real, on-chain.
 
 ---
 
-## CLOSE · ~0:18  `[Slides 13–14 — recap + roadmap]`
+## CLOSE · ~0:18  `[Slides 11–12 — recap + roadmap]`
 
-**[04:48 · Slide 13 — recap]**
+**[04:45 · Slide 11 — recap]**
 That's TokenLaunchHook Studio: fairness enforced by the pool, not the token. One v4 hook, NFT governance,
 no admin key, non-upgradeable — and live on mainnet today.
 
-**[04:58 · Slide 14 — roadmap]**
+**[04:55 · Slide 12 — roadmap]**
 And it's a studio, so here's where it goes: a richer studio UI, more hooks — vesting, LBPs, lockers — and
 an opt-in **protocol fee** taken from campaign revenue to sustain it. Thanks for watching.
 
-**[05:08 · end]**
+**[05:05 · end]**
 
 ---
 
 ### Timing cushion
-If you're running long, the safest cuts: trim Act 1 slides 7–9 (wallets / reads-vs-writes / transparency)
-to one sentence each, and in the demo skip the governance *relax* step — the launch plus the anti-snipe
-revert are the money shots. If you're short, let the green `forge test` summary and the post-launch call
-trace linger.
+If you're running long, the safest cuts: trim Act 1 slide 7 (the "not just a launcher" / demo slide) to
+one sentence, and in the demo skip the governance *relax* step — the launch plus the anti-snipe revert are
+the money shots. If you're short, let the green `forge test` summary and the post-launch call trace linger.
