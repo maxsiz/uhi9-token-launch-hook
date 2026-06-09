@@ -75,7 +75,8 @@ The studio's job isn't only to *launch* a campaign — it **demonstrates the Uni
 <p class="muted">Every action is labelled with the callback it triggers — see the mechanism, don't just trust it.</p>
 
 Note:
-The front end isn't just a launcher — it's a runnable demo of the hook itself. Every control is badged with the v4 hook callback it triggers, and after each transaction we trace exactly what the hook did. So you can watch the mechanisms — anti-snipe, tax, lock, whitelist — actually fire on-chain, not just trust that they do.
+And the front end isn't only a launcher — it's a runnable demo of the hook. Every control during the launch is badged with
+v4-hook callback it fires. So you can see which mechanisms addressed by exact V4 hook call actions.
 
 ---
 

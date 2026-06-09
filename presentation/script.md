@@ -10,7 +10,7 @@ Timecodes are cumulative (when each part should *start*). Slide numbers match `s
 
 **[00:00 · Slide 1 — Title / Studio]**
 Hi. This is **TokenLaunchHook Studio** — think of it as a *studio for Uniswap v4 launch hooks*. The
-framework is one shared hook plus pluggable mechanisms; what you'll see today is **one** hook built on it — a fair-launch hook — as the example. It does not require changes to the token contract.
+framework is: one shared hook plus pluggable mechanisms; what you'll see today is **one** hook built on it — a fair-launch hook — as the example. It does not require changes to the token contract.
 
 **[00:18 · Slide 2 — The pains]**
 As you remember from past bull run every token launch was a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax every early buyer. Teams pull the liquidity. And nobody gets fair access. This hook answers each of those pains directly. The usual alternative was to bake the logic into the ERC-20 itself — more code, more audits — but every one of these pains happens in the *pool*, so the fix should belongs in the pool as well.
@@ -32,12 +32,11 @@ Who controls a launch? Whoever holds the **governance NFT** — which is just th
 Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData..
 
 **[02:04 · Slide 7 — Not just a launcher]**
-And the front end isn't only a launcher — it's a runnable demo of the hook. Every control is badged with
-the v4-hook callback it fires, and after each transaction we trace exactly what the hook did. So you watch
-the mechanisms — anti-snipe, tax, lock, whitelist — fire on-chain, not just trust them.
+And the front end isn't only a launcher — it's a runnable demo of the hook. Every control during the launch is badged with
+v4-hook callback it fires. So you can see which mechanisms addressed by exact V4 hook call actions.
 
 **[02:18 · Slide 8 — Status & on-chain proof]**
-And this is real. **147 tests pass** — fuzz tests on the tax-decay math, fork tests against the live
+Rirht now: **147 tests pass** — fuzz tests on the tax-decay math, fork tests against the live
 Uniswap v4 contracts — four core contracts plus five mechanism modules, and a **headless self-test** that
 drives a real launch and swaps from a headless browser through an injected wallet, asserting every
 mechanism on-chain. It's live on three chains including Ethereum mainnet. Two public transactions to
