@@ -8,12 +8,18 @@
 V4 hook attached to a newly launched token's pool. Enforces fair-launch rules (anti-snipe, dynamic LP fee tax, conditional liquidity lock, whitelist phase) without modifying the ERC-20 token contract. Single hook deployment per chain serves all launches.
 
 ## Hackathon submission
+### Partner integrations
+ - Uniswap
+ - Unichain
 
 - 🌐 **Live studio** — <https://uhi9-token-launch-hook.vercel.app/>
 - 🖥️ **Presentation** — <https://iber.dev/uhi9-token-launch-hook>
 - 🎬 **Demo video** — _coming soon_
 
-**147 tests green** — unit · fuzz · mainnet-fork. Live on **Ethereum**, **Unichain** & **Unichain Sepolia**. See [`web/`](web/) for the Studio dApp and [`presentation/`](presentation/) for the deck.
+**147 tests green** — unit · fuzz · mainnet-fork. Live on **Ethereum**, **Unichain** & **Unichain Sepolia**. See [`web/`](web/) for the Studio dApp and [`presentation/`](presentation/) for the deck.  
+[Transaction list with description](web/e2e/MECHANISM_TXS.md)
+
+
 
 ## Deployed contracts
 
