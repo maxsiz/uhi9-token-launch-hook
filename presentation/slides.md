@@ -75,8 +75,7 @@ The studio's job isn't only to *launch* a campaign — it **demonstrates the Uni
 <p class="muted">Every action is labelled with the callback it triggers — see the mechanism, don't just trust it.</p>
 
 Note:
-And the front end isn't only a launcher — it's a runnable demo of the hook. Every control during the launch is badged with
-v4-hook callback it fires. So you can see which mechanisms addressed by exact V4 hook call actions.
+The front end isn't just a launcher — it's a live demo of the hook: every control is badged with the v4 callback it fires, so you can see each mechanism map to an exact hook call.
 
 ---
 
