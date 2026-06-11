@@ -1,47 +1,47 @@
 # Narration script — 5-minute hackathon video
 
 **Total target: 5:00.** Read at ~150 wpm. Cues in `[brackets]` are for the editor / screen, not read aloud.
-Timecodes are cumulative (when each part should *start*). Slide numbers match `slides.md` (11 slides:
-8 presentation + terminal + browser + roadmap).
+Timecodes are cumulative (when each part should *start*) — they now leave slack so you're never rushed.
+Slide numbers match `slides.md` (11 slides: 8 presentation + terminal + browser + roadmap).
 
 ---
 
 ## ACT 1 — Presentation · ~2:30  `[screen: Reveal deck, fullscreen]`
 
 **[00:00 · Slide 1 — Title / Studio]**
-Hi. This is **TokenLaunchHook Studio** — think of it as a *studio for Uniswap v4 launch hooks*. The
-framework is: one shared hook plus pluggable mechanisms; what you'll see today is **one** hook built on it — a fair-launch hook — as the example. It does not require changes to the token contract.
+This is **TokenLaunchHook Studio** — a studio for Uniswap v4 launch hooks. Today, one hook built on it: a
+fair-launch hook. The token contract is never touched.
 
 **[00:18 · Slide 2 — The pains]**
-As you remember from past bull run every token launch was a battlefield. Snipers grab the first block and dump on everyone. Sandwich bots tax every early buyer. Teams pull the liquidity. And nobody gets fair access. This hook answers each of those pains directly. The usual alternative was to bake the logic into the ERC-20 itself — more code, more audits — but every one of these pains happens in the *pool*, so the fix should belongs in the pool as well.
+Every token launch is a battlefield: snipers grab the first block, sandwich bots tax early buyers, teams
+pull liquidity, nobody gets fair access. The usual fix bakes logic into the ERC-20 — more code, more
+audits. But these pains happen in the *pool*, so the fix belongs there.
 
 **[00:42 · Slide 3 — Insight]**
-v4 hooks let you run code on every pool action. So we wrote one hook that enforces the launch rules on
-swaps, liquidity adds, and removals. The ERC-20 stays a plain ERC-20 — you can even bring your own.
+v4 hooks run code on every pool action. So one hook enforces the rules on swaps, adds, and removals — the
+ERC-20 stays plain, bring your own.
 
 **[00:58 · Slide 4 — Four mechanisms]**
-Four mechanisms, each wired to a specific callback. **Anti-snipe** caps the buy size during the launch
-window. A **buy / sell tax** — Uniswap's dynamic LP fee — asymmetric and *decaying* to a floor, so it
-protects at launch then fades. A **liquidity lock** stops the rug, by time and/or by traded volume. And
-an optional **whitelist phase**. You enable whichever you want, per launch.
+Four mechanisms, each on a callback: **anti-snipe** caps buy size; a decaying **buy/sell tax** via the
+dynamic LP fee; a **liquidity lock** by time or volume; an optional **whitelist**. Enable any subset.
 
 **[01:26 · Slide 5 — Governance]**
-Who controls a launch? Whoever holds the **governance NFT** — which is just the deployer's own liquidity position. No owner address, no admin key. Every change is a one-way ratchet: you can only make it *fairer* — lower the tax, shorten the lock — never the reverse. When the launch window ends, all mechanisms are disabled and the pool continues to operate in normal swap mode.
+Control is the **governance NFT** — just the deployer's own LP position, no admin key. Changes are a
+one-way ratchet: only *fairer* — lower tax, shorter lock. When the window ends, mechanisms switch off and
+the pool trades normally.
 
 **[01:48 · Slide 6 — Architecture]**
-Under the hood: Four contracts, deployed once per chain. Every launch is a single **atomic transaction** multicall — optional ERC20 deployment (cheap EIP-1167 clone), pool init plus the seed mint, with all the module config passed in hookData..
+Four contracts, deployed once per chain. A launch is one **atomic multicall** — optional EIP-1167 token
+clone, pool init, seed mint — with all config passed in hookData.
 
 **[02:04 · Slide 7 — Not just a launcher]**
-And the front end isn't only a launcher — it's a runnable demo of the hook. Every control during the launch is badged with
-v4-hook callback it fires. So you can see which mechanisms addressed by exact V4 hook call actions.
+And the front end isn't just a launcher — it's a live demo of the hook: every control is badged with the
+v4 callback it fires, so you watch the mechanisms run, not just trust them.
 
 **[02:18 · Slide 8 — Status & on-chain proof]**
-Rirht now: **147 tests pass** — fuzz tests on the tax-decay math, fork tests against the live
-Uniswap v4 contracts — four core contracts plus five mechanism modules, and a **headless self-test** that
-drives a real launch and swaps from a headless browser through an injected wallet, asserting every
-mechanism on-chain. It's live on three chains including Ethereum mainnet. Two public transactions to
-verify: an **all-modules launch** — twenty-two events in one tx — and a governance action authorized only
-by holding the NFT.
+And it's real: **147 tests** — fuzz and mainnet-fork — plus a headless self-test that drives a real launch
+and swaps on-chain. Live on three chains. Two public txs to verify: an **all-modules launch** and a
+governance action.
 
 ---
 
@@ -51,53 +51,46 @@ by holding the NFT.
 But does it hold up? `[run: forge test -vvv]`
 
 **[02:40]**
-This is the full suite — **147 tests, all green.** Unit tests for each mechanism, **fuzz tests** that
-prove the tax-decay math stays within bounds and only ever decreases, and **mainnet-fork tests** that run
-against the live Uniswap v4 contracts. `[let the green summary sit on screen for a beat]`
+The full suite — **147 tests, all green**: unit, fuzz on the tax-decay math, and mainnet-fork against live
+Uniswap v4. `[let the green summary sit for a beat]`
 
 ---
 
 ## ACT 3 — Live demo · ~1:35  `[switch to browser: uhi9-token-launch-hook.vercel.app]`
 
 **[03:20 · Slide 10 → landing / network selector]**
-Here's the live studio. Up top, the network selector — we're on three chains. I'll switch to **Unichain
-Sepolia** for the demo. `[pick Unichain Sepolia]`
+The live studio. Network selector up top — I'll switch to **Unichain Sepolia**. `[pick Unichain Sepolia]`
 
 **[03:30 · /launch]**
-Let's launch a token. The wizard deploys a fresh ERC-20 from the factory, pairs it, and sets the price
-from the seed amounts. `[fill token + pair + seed]` Now the mechanisms — I'll turn on anti-snipe and the
-buy/sell tax; each shows the **hook callback** it will run. `[enable anti-snipe + tax]` Review shows the
-price and the exact mint, and we sign — from a plain wallet, because the hook's anti-sandwich check needs
-`tx.origin == msg.sender`. `[sign in Rabby]`
+Launch a token: the wizard deploys a fresh ERC-20, pairs it, prices it from the seeds. Turn on anti-snipe
+and the tax — each shows its **hook callback**. `[enable anti-snipe + tax]` Review, then sign from a plain
+wallet — the hook needs `tx.origin == msg.sender`. `[sign in Rabby]`
 
 **[03:55 · post-launch trace]**
-Done — one transaction. And here's the **call trace**: the hook fired `beforeAddLiquidity`, captured the
-governance NFT, and armed the mechanisms.
+Done — one tx. The **call trace**: the hook fired `beforeAddLiquidity`, captured the gov NFT, armed the
+mechanisms.
 
 **[04:07 · /governance]**
-On the Governance page it discovers my campaign from my wallet's positions — live hook state read
-straight from chain. As the NFT holder I can **relax** a parameter — lower the tax. `[lower tax → sign]`
-One-way only; the hook rejects anything that isn't a relaxation.
+Governance discovers my campaign from my wallet — live hook state from chain. As NFT holder I **relax** a
+param — lower the tax. `[lower tax → sign]` One-way only; the hook rejects anything else.
 
 **[04:25 · /swap]**
-And trading. A normal buy goes through with the current tax applied. `[do a small buy]` But a buy bigger
-than the anti-snipe cap — `[enter oversized amount]` — the hook **reverts**, decoded as *buy too large*.
-The sniper protection is real, on-chain.
+And trading: a normal buy applies the current tax. `[small buy]` A buy over the anti-snipe cap —
+`[oversized amount]` — the hook **reverts**, *buy too large*. Real, on-chain.
 
 ---
 
 ## CLOSE · ~0:15  `[Slide 11 — roadmap]`
 
 **[04:50 · Slide 11 — roadmap]**
-That's TokenLaunchHook Studio — fairness in the pool, not the token. And it's a studio, so here's where it
-goes: a richer UI, more hooks — vesting, LBPs, lockers — and an opt-in **protocol fee** taken from
-campaign revenue to sustain it. Thanks for watching.
+That's TokenLaunchHook Studio — fairness in the pool, not the token. Next: a richer UI, more hooks, and an
+opt-in **protocol fee** from campaign revenue. Thanks for watching.
 
 **[05:05 · end]**
 
 ---
 
 ### Timing cushion
-If you're running long, the safest cuts: trim Act 1 slide 7 (the "not just a launcher" / demo slide) to
-one sentence, and in the demo skip the governance *relax* step — the launch plus the anti-snipe revert are
-the money shots. If you're short, let the green `forge test` summary and the post-launch call trace linger.
+The narration is intentionally short — let pauses breathe. If you're still long, skip the governance
+*relax* step; the launch plus the anti-snipe revert are the money shots. If short, let the green
+`forge test` summary and the post-launch call trace linger.
