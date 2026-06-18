@@ -11,6 +11,7 @@ A 5-minute pitch video for **TokenLaunchHook Studio**. Structure: **① presenta
 | `slides.md` | The slides, in Reveal markdown. Speaker notes live in `Note:` blocks. |
 | `script.md` | The full English narration, timed in 3 acts, with on-screen cues. |
 | `script-demo.md` | Demo-first cut — slides compressed to ~1:00, the rest given to the live demo. |
+| `script-landing-1min.md` | No-deck cut — ~1:00 spoken intro on the live landing page, then demo. |
 | `demo-checklist.md` | Pre-flight checklist for the live launch in Act 3. |
 | `diagrams/*.mmd` | Mermaid sources for the technical diagrams. |
 | `diagrams/*.svg` | Pre-rendered static SVGs embedded in the slides (no runtime Mermaid dep). |
