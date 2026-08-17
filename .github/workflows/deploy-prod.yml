@@ -100,27 +100,81 @@ jobs:
           printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Upload release
+      # A secret pasted from a browser or a Windows clipboard easily carries a trailing newline,
+      # a CR or stray quotes. ssh then dies with "hostname contains invalid characters" before it
+      # opens a socket, which looks identical to a network problem from the host side — the target
+      # sees no connection at all. Strip that here, once, and fail with our own wording.
+      - name: Preflight — sanitise and validate deploy target
         env:
-          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          RAW_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          RAW_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+
+          # Diagnostics go to stderr and the cleaned value to stdout, so that a failing check
+          # propagates through the command substitution below instead of being swallowed.
+          check() {
+            local name="$1" raw="$2" cleaned
+            cleaned="$(printf '%s' "$raw" | tr -d '[:space:]' | tr -d "\"'")"
+            echo "$name: raw ${#raw} chars -> cleaned ${#cleaned} chars" >&2
+            if [ "${#raw}" -ne "${#cleaned}" ]; then
+              # Show only the offending bytes, never the value itself.
+              echo "  stripped bytes (hex):$(printf '%s' "$raw" | LC_ALL=C tr -cd '\000-\037\177 "'"'" | od -An -tx1 | tr -s ' ')" >&2
+              echo "::warning::$name contained whitespace/CR/quotes. Stripped for this run, but fix the secret." >&2
+            fi
+            if [ -z "$cleaned" ]; then
+              echo "::error::$name is empty. Set it under Settings -> Secrets and variables -> Actions -> Secrets (repository scope), not Variables." >&2
+              return 1
+            fi
+            case "$cleaned" in
+              *[!A-Za-z0-9._-]*)
+                echo "::error::$name still holds characters ssh will reject after cleaning. Expected an IPv4 address or a DNS name." >&2
+                return 1 ;;
+            esac
+            printf '%s' "$cleaned"
+          }
+
+          SSH_HOST="$(check PROD_SSH_HOST "$RAW_SSH_HOST")"
+          SSH_USER="$(check PROD_SSH_USER "$RAW_SSH_USER")"
+          # Cleaned values differ from the raw secrets, so GitHub's masking no longer covers them and
+          # they print in clear. That is deliberate: a masked host is undiagnosable, and neither the
+          # host nor the user name is a credential.
+          echo "target: ${SSH_USER}@${SSH_HOST}"
+          {
+            echo "SSH_HOST=$SSH_HOST"
+            echo "SSH_USER=$SSH_USER"
+          } >> "$GITHUB_ENV"
+
+          # A key that does not parse still lets ssh open a socket and fail at auth, so this is a
+          # different failure mode from the one above — worth naming separately.
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::PROD_SSH_KEY does not parse as an OpenSSH private key. Re-paste it whole, including the BEGIN/END lines."
+            exit 1
+          fi
+          echo "deploy key fingerprint: $(ssh-keygen -lf ~/.ssh/deploy_key | awk '{print $2}')"
+
+          if ! ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 \
+                 "$SSH_USER@$SSH_HOST" true; then
+            echo "::error::Cannot open an SSH session to ${SSH_USER}@${SSH_HOST}. Check that the public half of PROD_SSH_KEY is in ~${SSH_USER}/.ssh/authorized_keys on the host, and that PROD_SSH_KNOWN_HOSTS matches its current host key."
+            exit 1
+          fi
+          echo "ssh preflight: ok"
+
+      - name: Upload release
         run: |
           set -euo pipefail
           RELEASE="${GITHUB_SHA::12}-$(date -u +%Y%m%d%H%M%S)"
           echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" \
             "mkdir -p '$DEPLOY_PATH/releases/$RELEASE'"
           rsync -az --delete \
-            -e "ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes" \
+            -e "ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20" \
             .release/ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/releases/$RELEASE/"
 
       - name: Activate release
-        env:
-          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-          SSH_USER: ${{ secrets.PROD_SSH_USER }}
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" \
             "DEPLOY_PATH='$DEPLOY_PATH' RELEASE='$RELEASE' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$DEPLOY_PATH"
@@ -135,20 +189,17 @@ jobs:
           REMOTE
 
       - name: Verify
-        env:
-          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
-          SSH_USER: ${{ secrets.PROD_SSH_USER }}
         run: |
           set -euo pipefail
           for i in $(seq 1 30); do
-            state=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            state=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" \
               "docker inspect -f '{{.State.Health.Status}}' unilaunch_prod" 2>/dev/null || echo pending)
             echo "attempt $i: $state"
             [ "$state" = "healthy" ] && exit 0
             sleep 5
           done
           echo "::error::unilaunch_prod did not become healthy"
-          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" \
             "docker logs --tail 80 unilaunch_prod" || true
           exit 1
 
