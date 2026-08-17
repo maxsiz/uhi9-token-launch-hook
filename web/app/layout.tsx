@@ -5,8 +5,10 @@ import { ConnectButton } from "@/components/ui/ConnectButton";
 import { NetworkSelector } from "@/components/ui/NetworkSelector";
 import { Logo } from "@/components/ui/Logo";
 import Link from "next/link";
+import { GoogleTagManager } from "@next/third-parties/google";
 import {
   GOOGLE_SITE_VERIFICATION,
+  GTM_ID,
   INDEXABLE,
   REPO_URL,
   SITE_DESCRIPTION,
@@ -64,6 +66,9 @@ const jsonLd = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      {/* Analytics only where analytics is wanted: the same flag that gates indexing keeps stage,
+          preview and local traffic out of the production GA4 property. */}
+      {INDEXABLE && GTM_ID ? <GoogleTagManager gtmId={GTM_ID} /> : null}
       <body>
         <script
           type="application/ld+json"

@@ -9,6 +9,7 @@ import { CONTRACTS } from "@/lib/config/contracts.generated";
 import { PERMIT2 } from "@/lib/config/uniswap";
 import { type SupportedChainId } from "@/lib/config/chains";
 import { decodeContractError } from "@/lib/tx/revert";
+import { moduleLabel, track } from "@/lib/analytics";
 import { buildPermitData } from "./permit2";
 import { prepareAutoLaunch, prepareLaunch, type LaunchFormInput, type ModuleConfigInput } from "./launch";
 
@@ -117,6 +118,16 @@ export function useLaunch(chainId: SupportedChainId) {
     setResult(undefined);
     const { wrapper } = CONTRACTS[chainId];
 
+    // Funnel: `launch_start` fires before the first wallet prompt, `launch_campaign` only once the
+    // campaign is mined — the gap between the two is the drop-off we care about.
+    const shape = {
+      chain_id: chainId,
+      token_mode: form.tokenMode,
+      pair_mode: form.pairMode,
+      modules: moduleLabel(form.enabled),
+    } as const;
+    track("launch_start", shape);
+
     const base = {
       seedTokenHuman: form.seedToken,
       seedPairHuman: form.seedPair,
@@ -164,6 +175,7 @@ export function useLaunch(chainId: SupportedChainId) {
     }
 
     setResult(out);
+    track("launch_campaign", shape);
     return out;
   }
 

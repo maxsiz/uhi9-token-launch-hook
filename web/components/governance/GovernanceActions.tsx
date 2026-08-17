@@ -9,6 +9,7 @@ import { TokenLaunchHookAbi } from "@/lib/config/abi";
 import { EXPLORER, type SupportedChainId } from "@/lib/config/chains";
 import { formatUtc, percentToTaxUnits, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 import { decodeContractError } from "@/lib/tx/revert";
+import { track } from "@/lib/analytics";
 import { TxStatus, type TxPhase } from "@/components/ui/TxStatus";
 
 function toUnix(local: string): bigint {
@@ -70,6 +71,8 @@ export function GovernanceActions({ chainId, pid, hook }: { chainId: SupportedCh
       setPhase("pending");
       await client?.waitForTransactionReceipt({ hash });
       setTxHash(hash);
+      // `key` is already the action name the panel uses ("setTax", "whitelist", …).
+      track("governance_update", { chain_id: chainId, action: key });
       await refetch?.();
     } catch (e: unknown) {
       setErr(decodeContractError(e, "Transaction failed"));

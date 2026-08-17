@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { truncateAddress } from "@/lib/format";
+import { track } from "@/lib/analytics";
 
 /**
  * Injected-only connect control (MetaMask / Rabby via EIP-6963). No WalletConnect. A single
@@ -10,14 +11,21 @@ import { truncateAddress } from "@/lib/format";
  * extensions don't each render their own button. Connected state shows the address + disconnect.
  */
 export function ConnectButton() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
   const [open, setOpen] = useState(false);
 
   if (isConnected) {
     return (
-      <button className="btn-ghost" onClick={() => disconnect()}>
+      <button
+        className="btn-ghost"
+        onClick={() => {
+          // The address itself is never sent — only the wallet brand and the chain.
+          track("wallet_disconnect", { chain_id: chainId });
+          disconnect();
+        }}
+      >
         {truncateAddress(address)} · Disconnect
       </button>
     );
@@ -53,6 +61,7 @@ export function ConnectButton() {
                   key={c.uid}
                   disabled={isPending}
                   onClick={() => {
+                    track("wallet_connect", { connector: c.name, chain_id: chainId });
                     connect({ connector: c });
                     setOpen(false);
                   }}

@@ -13,6 +13,7 @@ import { formatAmount, taxUnitsToPercent, truncateAddress } from "@/lib/format";
 import { quoteExactInputSingle } from "@/lib/swap/quote";
 import { decodeRevertReason } from "@/lib/swap/revertReason";
 import { buildUniversalRouterSwap } from "@/lib/swap/buildSwap";
+import { track } from "@/lib/analytics";
 import { Spinner } from "@/components/ui/Spinner";
 import { TxStatus, type TxPhase } from "@/components/ui/TxStatus";
 import {
@@ -204,7 +205,9 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
   const effTax = isBuy ? campaign.effectiveBuyTax : campaign.effectiveSellTax;
   const phaseLabel = ["Pre", "Active", "Frozen"][campaign.phase] ?? "?";
 
-  async function runWrite(fn: () => Promise<Hex>) {
+  // `kind` distinguishes the two approval writes from the swap itself — only the swap is a
+  // conversion, an approval is plumbing.
+  async function runWrite(fn: () => Promise<Hex>, kind: "approve" | "swap" = "approve") {
     setActionErr(undefined);
     setBusy(true);
     setPhase("confirm");
@@ -214,6 +217,7 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       setPhase("pending");
       await client?.waitForTransactionReceipt({ hash });
       setTxHash(hash);
+      if (kind === "swap") track("swap_execute", { chain_id: chainId, direction: isBuy ? "buy" : "sell" });
       await Promise.all([allowanceReads.refetch?.(), wlRead.refetch?.()]);
     } catch (e: unknown) {
       setActionErr(decodeRevertReason(e));
@@ -268,15 +272,17 @@ export function SwapWidget({ chainId, pid }: { chainId: SupportedChainId; pid: H
       amountOutMinimum: minOut,
       deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 20),
     });
-    return runWrite(() =>
-      simulateAndWrite({
-        chainId,
-        address: uni.universalRouter as Address,
-        abi: UniversalRouterAbi,
-        functionName: "execute",
-        args: [call.commands, call.inputs, call.deadline],
-        value: call.value,
-      })
+    return runWrite(
+      () =>
+        simulateAndWrite({
+          chainId,
+          address: uni.universalRouter as Address,
+          abi: UniversalRouterAbi,
+          functionName: "execute",
+          args: [call.commands, call.inputs, call.deadline],
+          value: call.value,
+        }),
+      "swap"
     );
   };
 

@@ -4,7 +4,7 @@ Two independent targets:
 
 | Target | URL | How | Built by |
 | --- | --- | --- | --- |
-| **stage** | `https://uhi9-token-launch-hook.vercel.app` | Vercel, auto-deploy on push to `master` | Vercel |
+| **stage** | `<project>.vercel.app` | Vercel, auto-deploy on push to `master` | Vercel |
 | **prod** | `https://unilaunch.envelop.is` | Node standalone container behind Traefik on `88.99.35.38` | GitHub Actions (`.github/workflows/deploy-prod.yml`) |
 
 The app deliberately does **not** live under `fundoria.envelop.is`. That domain is not ours: it is
@@ -74,7 +74,8 @@ otherwise           -> indexable unless the build runs on Vercel (which always s
 
 So no dashboard variable is needed on either side, and no source file names an environment. When a
 build is not indexable it: serves `X-Robots-Tag: noindex, nofollow` on every route, renders
-`<meta name="robots" content="noindex, nofollow">`, and advertises no sitemap in `robots.txt`.
+`<meta name="robots" content="noindex, nofollow">`, advertises no sitemap in `robots.txt`, and does
+not mount GTM (so stage clicks never land in the production GA4 property).
 
 `robots.txt` on a non-indexable build still says `Allow: /` on purpose. `Disallow: /` would stop a
 crawler fetching the page, and a page it cannot fetch is a page whose `noindex` it can never read —
@@ -230,3 +231,32 @@ ssh devops@88.99.35.38 'docker inspect -f "{{.State.Status}} {{.State.Health.Sta
 
 Then run the functional checklist from the stage section against the prod URL.
 
+---
+
+# SEO and analytics
+
+Owned by the `seo-web-ops` agent; the Google-side objects live under the same Envelop account as
+`unisafe.envelop.is`.
+
+| Thing | Value |
+| --- | --- |
+| GA4 property | `properties/550099831` ("unilaunch"), account `393356740` |
+| GA4 measurement id | `G-FK7SVLRRK6` (web stream `unilaunch web`) |
+| GTM container | `GTM-ML64J4C3` ("unilaunch.envelop.is"), account `6353143308` |
+| GA4 key events | `launch_campaign`, `swap_execute`, `governance_update` |
+| Search Console | URL-prefix property `https://unilaunch.envelop.is/`, verified by the `<meta>` token in `lib/config/site.ts` |
+
+A separate GA4 property rather than a second stream on `unisafe`: it is a different product with a
+different funnel, and GA4 key events, audiences and reports are all property-scoped — sharing a
+property would mean every unisafe report silently mixing in launch-studio traffic.
+
+The app talks only to the GTM dataLayer, through `lib/analytics.ts`. Event names there must match the
+custom-event triggers in the container one-for-one; adding an event means adding a trigger + a GA4
+event tag in GTM and publishing a container version. No wallet address, ENS name or tx hash is ever
+sent — only chain ids, coarse mode labels and counts.
+
+**Known debt:** there is no consent banner, so GA4 runs with `analytics_storage` granted by default.
+Not GDPR-clean for the EEA. `lib/analytics.ts` is the single place to gate when Consent Mode v2 lands.
+
+`app/robots.ts`, `app/sitemap.ts` and `app/opengraph-image.tsx` are all derived from `SITE_URL`, so
+they follow whatever origin the build was given — nothing to update by hand when a domain changes.

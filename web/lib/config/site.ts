@@ -51,6 +51,13 @@ export const SITE_URL = resolveSiteUrl();
 export const INDEXABLE = process.env.NEXT_PUBLIC_SEO_INDEXABLE !== "0";
 
 /**
+ * GTM container that carries the GA4 configuration tag (property "unilaunch", G-FK7SVLRRK6).
+ * Not a secret — a container id is public by design, it ships in every page of the site.
+ * Set `NEXT_PUBLIC_GTM_ID=""` to build without analytics at all.
+ */
+export const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID ?? "GTM-ML64J4C3";
+
+/**
  * Google Search Console ownership token (URL-prefix property, META method). Public by design: its
  * only power is to prove control of this origin, which requires already controlling this origin.
  */
