@@ -2,9 +2,47 @@ name: CI
 
 permissions: {}
 
+# This workflow builds and tests the Foundry project, so it only needs to run when something the
+# contracts actually depend on changes. The repo also carries a Next.js app (web/), a slide deck,
+# host deploy files and task notes; none of those can affect `forge build` or `forge test`.
+#
+# Kept deliberately as an allow-list rather than an ignore-list: a new top-level directory then
+# defaults to "does not run the contract suite", which is the safe direction for a repo whose
+# non-contract surface keeps growing.
+#
+# `broadcast/` is NOT here on purpose. Nothing under test/ or src/ reads it — only the helper
+# script/print_tx_links.py does, and script/ is already covered.
+#
+# Use workflow_dispatch for a full run on demand.
+#
+# The two lists below are duplicated rather than shared through a YAML anchor: anchors happen to
+# work in Actions today but are not part of the documented workflow syntax, and a CI gate is a bad
+# place to depend on that. Keep them in sync by hand.
 on:
   push:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "script/**"
+      # Submodules appear as gitlinks (lib/forge-std, lib/v4-hooks-public), one path segment deep;
+      # `lib/**` matches those as well as anything vendored inside them.
+      - "lib/**"
+      - ".gitmodules"
+      - "foundry.toml"
+      - "foundry.lock"
+      - "remappings.txt"
+      - ".github/workflows/test.yml"
   pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+      - "script/**"
+      - "lib/**"
+      - ".gitmodules"
+      - "foundry.toml"
+      - "foundry.lock"
+      - "remappings.txt"
+      - ".github/workflows/test.yml"
   workflow_dispatch:
 
 env:
