@@ -126,6 +126,20 @@ Variables (optional, have defaults): `PROD_DEPLOY_PATH` (`/home/devops/unilaunch
 RPC keys are **not** GitHub secrets — they live only in the host `.env`, because `/api/rpc` reads
 them at request time, not at build time.
 
+### Which chains the proxy serves
+
+`/home/devops/unilaunch/.env` on the host fills `RPC_URL_1301`, `RPC_URL_130` and `RPC_URL_1` —
+the three chains this project has contracts on. `RPC_URL_8453` and `RPC_URL_42161` are left unset on
+purpose: `/api/rpc` answers `501` for them and the client falls back to its public endpoint, which is
+the correct behaviour for a chain we do not deploy to.
+
+Those endpoints are **shared with `unisafe_prod`** on the same box, which is where they came from.
+1301 and 130 are QuickNode, and QuickNode meters per endpoint rather than per application, so a
+traffic spike on either app spends the other's quota. That is fine at today's volume and worth
+remembering the day it is not: if either app starts seeing `429`s, split the endpoints before
+looking for a bug in the app. `RPC_URL_1` points at `rpc.envelop.is`, our own node, so it has no
+third-party quota at all.
+
 ## Deploying
 
 Automatic on push to `master` touching `web/**` or `broadcast/**` (markdown-only changes do not
