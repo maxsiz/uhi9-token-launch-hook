@@ -1,0 +1,157 @@
+name: Deploy prod (unilaunch.envelop.is)
+
+# Builds the Next.js app in `web/` as a Node standalone bundle and ships it over SSH
+# to the self-hosted production host, where it runs behind traefik as `unilaunch_prod`.
+# Stage stays on Vercel and is not touched by this workflow.
+#
+# Required repository secrets:
+#   PROD_SSH_KEY          private key (OpenSSH format) of a deploy key authorised on the host
+#   PROD_SSH_HOST         host IP / DNS name
+#   PROD_SSH_USER         ssh user (devops)
+#   PROD_SSH_KNOWN_HOSTS  output of `ssh-keyscan <host>` — pins the host key, no TOFU
+# Optional repository variables:
+#   PROD_DEPLOY_PATH      deploy root on the host (default /home/devops/unilaunch)
+#   NEXT_PUBLIC_SITE_URL  metadata base (default https://unilaunch.envelop.is)
+#
+# Server-only RPC keys (RPC_URL_*) live on the host in <deploy path>/.env — never in the build.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "web/**"
+      - "broadcast/**"
+      - ".github/workflows/deploy-prod.yml"
+      - "!**/*.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Build and ship standalone bundle
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH || '/home/devops/unilaunch' }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || 'https://unilaunch.envelop.is' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          # `web/scripts/gen-contracts.ts` (prebuild) reads ../broadcast — needs the full tree,
+          # but no submodules: the Foundry libs are irrelevant to the web build.
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Build (standalone)
+        working-directory: web
+        env:
+          NEXT_OUTPUT_STANDALONE: "1"
+        run: npm run build
+
+      # Next's standalone output is a minimal server + traced node_modules; static assets and
+      # `public/` are deliberately NOT copied into it, so we assemble the runnable tree here.
+      - name: Assemble release tree
+        working-directory: web
+        run: |
+          set -euo pipefail
+          rm -rf ../.release
+          mkdir -p ../.release
+          cp -r .next/standalone/. ../.release/
+          mkdir -p ../.release/.next/static
+          cp -r .next/static/. ../.release/.next/static/
+          cp -r public ../.release/public
+          test -f ../.release/server.js
+          du -sh ../.release
+
+      - name: Configure SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+          RELEASE="${GITHUB_SHA::12}-$(date -u +%Y%m%d%H%M%S)"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "mkdir -p '$DEPLOY_PATH/releases/$RELEASE'"
+          rsync -az --delete \
+            -e "ssh -i $HOME/.ssh/deploy_key -o BatchMode=yes" \
+            .release/ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/releases/$RELEASE/"
+
+      - name: Activate release
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' RELEASE='$RELEASE' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          test -f "releases/$RELEASE/server.js"
+          ln -sfn "$DEPLOY_PATH/releases/$RELEASE" "$DEPLOY_PATH/current.new"
+          mv -T "$DEPLOY_PATH/current.new" "$DEPLOY_PATH/current"
+          # The bind mount source is a symlink, resolved by dockerd at container creation —
+          # a plain `restart` would keep serving the old release, hence --force-recreate.
+          docker compose up -d --force-recreate
+          # Keep the five most recent releases so a rollback target always exists.
+          ls -1dt releases/*/ | tail -n +6 | xargs -r rm -rf
+          REMOTE
+
+      - name: Verify
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            state=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+              "docker inspect -f '{{.State.Health.Status}}' unilaunch_prod" 2>/dev/null || echo pending)
+            echo "attempt $i: $state"
+            [ "$state" = "healthy" ] && exit 0
+            sleep 5
+          done
+          echo "::error::unilaunch_prod did not become healthy"
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "docker logs --tail 80 unilaunch_prod" || true
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -13,3 +13,6 @@ docs/
 # Dotenv file
 .env
 logdo.md
+
+# Assembled Next.js standalone release tree (see web/DEPLOY.md, prod section)
+/.release/

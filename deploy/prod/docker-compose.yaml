@@ -1,0 +1,68 @@
+# unilaunch.envelop.is — production deployment of `web/` (Next.js standalone).
+#
+# Lives on 88.99.35.38 at /home/devops/unilaunch/docker-compose.yaml, behind the host Traefik on
+# the shared `hostenv_oracle` network. TLS is issued by Traefik via ACME DNS-01 (Cloudflare), so it
+# works behind the Cloudflare proxy (SSL/TLS mode "Full (strict)").
+#
+# NOTHING IS BUILT HERE. The GitHub Actions job `deploy-prod.yml` builds the standalone bundle and
+# rsyncs it to ./releases/<sha>-<ts>/, then repoints the ./current symlink and recreates this
+# container. The prod box has 2 vCPU and would not survive `next build`.
+#
+# Layout on the host:
+#   /home/devops/unilaunch/
+#     docker-compose.yaml   this file
+#     .env                  server-only RPC_URL_* (mode 600, host-local, NOT in git)
+#     current -> releases/<id>   symlink, swapped by the deploy job
+#     releases/<id>/        server.js, .next/, public/, node_modules/
+
+networks:
+  hostenv_oracle:
+    external: true
+
+services:
+  unilaunch:
+    image: node:20-alpine
+    container_name: unilaunch_prod
+    restart: always
+    working_dir: /app
+    command: ["node", "server.js"]
+    # The host's devops user is uid/gid 1000, and so is node:20-alpine's `node` user — the bundle
+    # rsynced as devops is readable and the process is not root.
+    user: "1000:1000"
+    # Bind source is the `current` symlink; dockerd resolves it at container creation, which is why
+    # the deploy job uses `up -d --force-recreate` rather than `restart`.
+    # Read-write on purpose: Next may write .next/cache at runtime.
+    volumes:
+      - ./current:/app
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    # Server-only secrets: RPC_URL_1301 and friends, read at request time by /api/rpc.
+    # Never NEXT_PUBLIC_DEV_BURNER_ADDRESS here — it swaps real wallets for a mock connector.
+    env_file:
+      - .env
+    networks:
+      - hostenv_oracle
+    healthcheck:
+      # busybox wget; the root route is statically prerendered, so this is cheap.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # The host `autoheal` container runs with AUTOHEAL_CONTAINER_LABEL=all, so it already restarts
+    # this container when the healthcheck goes unhealthy — no opt-in label is needed.
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "10"
+        max-size: "200k"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=hostenv_oracle
+      - traefik.http.routers.unilaunch.rule=Host(`unilaunch.envelop.is`)
+      - traefik.http.routers.unilaunch.entrypoints=websecure
+      - traefik.http.routers.unilaunch.tls=true
+      - traefik.http.routers.unilaunch.tls.certresolver=leresolver
+      - traefik.http.services.unilaunch.loadbalancer.server.port=3000
