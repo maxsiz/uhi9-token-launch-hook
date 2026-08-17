@@ -7,10 +7,13 @@ Two independent targets:
 | **stage** | `<project>.vercel.app` | Vercel, auto-deploy on push to `master` | Vercel |
 | **prod** | `https://unilaunch.envelop.is` | Node standalone container behind Traefik on `88.99.35.38` | GitHub Actions (`.github/workflows/deploy-prod.yml`) |
 
-`fundoria.envelop.is` is **not** ours — it is GitLab Pages serving the
-`envelop/design-and-layout/ido-aggregator` landing, owned by another team. `fundoria.envelop.is/unilaunch`
-is only a Cloudflare Redirect Rule (301) pointing at `unilaunch.envelop.is`; nothing of ours is served
-from that origin, and the landing team's `pages` job can rewrite their root without affecting us.
+The app deliberately does **not** live under `fundoria.envelop.is`. That domain is not ours: it is
+GitLab Pages serving the `envelop/design-and-layout/ido-aggregator` landing, owned by another team,
+whose `pages` job rewrites the site root on every push to their `main`. Putting our production app on
+a sub-path of it would have meant an origin we do not control, a Cloudflare Origin Rule plus an SNI
+override, and a `basePath` through the whole codebase — four coupled moving parts, any of which the
+other team could break without knowing we existed. Hence our own subdomain and a plain
+DNS → Traefik → container path. `fundoria.envelop.is/unilaunch` is a 404 and is expected to stay one.
 
 ---
 
@@ -176,7 +179,6 @@ curl -sS https://unilaunch.envelop.is/ | grep -o '/_next/static/[^"]*\.js' | hea
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST -H 'content-type: application/json' \
   --data '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
   'https://unilaunch.envelop.is/api/rpc?chainId=1301'                                   # 200 with a key, 501 without
-curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://fundoria.envelop.is/unilaunch  # 301
 ssh devops@88.99.35.38 'docker inspect -f "{{.State.Status}} {{.State.Health.Status}}" unilaunch_prod'
 ```
 
