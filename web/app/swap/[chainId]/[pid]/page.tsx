@@ -3,7 +3,16 @@ import { ConnectGate } from "@/components/ConnectGate";
 import { SwapWidget } from "@/components/swap/SwapWidget";
 import { isSupportedChain, type SupportedChainId } from "@/lib/config/chains";
 
-export const metadata = { title: "Swap — TokenLaunchHook Studio" };
+import type { Metadata } from "next";
+
+// An unbounded, per-campaign URL space (`/swap/<chainId>/<poolId>`) whose content only exists once a
+// wallet is connected: nothing worth indexing, and thousands of near-identical thin pages if it were.
+// It is left crawlable in robots.txt on purpose — a disallowed URL can never be read, and this
+// noindex is exactly what we need Google to read.
+export const metadata: Metadata = {
+  title: "Trade a campaign pool",
+  robots: { index: false, follow: true },
+};
 
 /**
  * Per-campaign swap page with a shareable URL: /swap/<chainId>/<pid>. A fallback Uniswap-style widget

@@ -1,7 +1,14 @@
 import { ConnectGate } from "@/components/ConnectGate";
 import { GovernanceDashboard } from "@/components/governance/GovernanceDashboard";
 
-export const metadata = { title: "Governance — TokenLaunchHook Studio" };
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Governance dashboard",
+  description:
+    "Manage a live TokenLaunchHook campaign from the governance NFT: relax the tax curve, shorten the lock, edit the whitelist, and watch the hook state per pool.",
+  alternates: { canonical: "/governance" },
+};
 
 export default function GovernancePage() {
   return (

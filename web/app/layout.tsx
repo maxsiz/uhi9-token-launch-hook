@@ -5,24 +5,71 @@ import { ConnectButton } from "@/components/ui/ConnectButton";
 import { NetworkSelector } from "@/components/ui/NetworkSelector";
 import { Logo } from "@/components/ui/Logo";
 import Link from "next/link";
+import {
+  GOOGLE_SITE_VERIFICATION,
+  INDEXABLE,
+  REPO_URL,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_URL,
+} from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: "TokenLaunchHook — Fair Launch Studio",
-  description:
-    "Launch a fair-launch token campaign in one transaction and watch exactly which Uniswap v4 hook callbacks enforce it. A live demo for TokenLaunchHook.",
+  metadataBase: new URL(SITE_URL),
+  // Child routes set only their own short title; the template appends the product name once.
+  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: `%s — ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: ["Uniswap v4", "hook", "fair launch", "anti-snipe", "token launch", "liquidity lock", "buy sell tax"],
   icons: { icon: "/favicon.svg" },
+  // The stage build must not compete with prod for the same content; see lib/config/site.ts.
+  robots: INDEXABLE
+    ? { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } }
+    : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
+  // Only meaningful on the origin it was issued for; harmless anywhere else.
+  verification: { google: GOOGLE_SITE_VERIFICATION },
   openGraph: {
-    title: "TokenLaunchHook — Fair Launch Studio",
-    description: "One-transaction fair-launch on Uniswap v4, with a live view of the hook in action.",
-    images: ["/og-image.png"],
+    type: "website",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    locale: "en_US",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    // og:image comes from app/opengraph-image.tsx (file convention) — no static asset to 404.
   },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+};
+
+// Structured data: one SoftwareApplication for the studio itself, so a rich result can show what the
+// thing is rather than guessing from the copy. Kept minimal and true — no ratings, no fake offers.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  applicationCategory: "FinanceApplication",
+  operatingSystem: "Web",
+  isAccessibleForFree: true,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  codeRepository: REPO_URL,
+  about: { "@type": "Thing", name: "Uniswap v4 hooks" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <script
+          type="application/ld+json"
+          // Static object we control — no user input reaches it.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <Providers>
           <div className="flex min-h-screen flex-col">
             <header className="border-b border-neutral-800">

@@ -1,6 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { HOOK_MAP } from "@/lib/hook/hookMap";
 import { HookBadge } from "@/components/hook/HookBadge";
+
+// Title and description are inherited from the root layout; only the canonical is per-route.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 const DEMO_FEATURES = ["antiSnipe", "tax", "lock", "whitelist"] as const;
 

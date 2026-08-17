@@ -4,7 +4,7 @@ Two independent targets:
 
 | Target | URL | How | Built by |
 | --- | --- | --- | --- |
-| **stage** | `<project>.vercel.app` | Vercel, auto-deploy on push to `master` | Vercel |
+| **stage** | `https://uhi9-token-launch-hook.vercel.app` | Vercel, auto-deploy on push to `master` | Vercel |
 | **prod** | `https://unilaunch.envelop.is` | Node standalone container behind Traefik on `88.99.35.38` | GitHub Actions (`.github/workflows/deploy-prod.yml`) |
 
 The app deliberately does **not** live under `fundoria.envelop.is`. That domain is not ours: it is
@@ -56,6 +56,38 @@ preview deploys configured too). All are optional.
   variable existed.
 
 There is **no** WalletConnect / `projectId` variable — wallets are injected-only.
+
+## Stage is kept out of search indexes
+
+Stage serves the same content as prod from the same `master`, which is exactly what a search engine
+calls a duplicate — and the one it demotes is whichever it decides is the copy. Vercel only sends
+`X-Robots-Tag: noindex` on *preview* deploys, not on the production deploy of the project, so
+`uhi9-token-launch-hook.vercel.app` was fully indexable until this was added.
+
+The switch is computed once in `next.config.mjs` and inlined as `NEXT_PUBLIC_SEO_INDEXABLE`, which
+`lib/config/site.ts` re-exports as `INDEXABLE`:
+
+```
+SEO_INDEXABLE set   -> use it (1 = indexable, 0 = not)
+otherwise           -> indexable unless the build runs on Vercel (which always sets VERCEL=1)
+```
+
+So no dashboard variable is needed on either side, and no source file names an environment. When a
+build is not indexable it: serves `X-Robots-Tag: noindex, nofollow` on every route, renders
+`<meta name="robots" content="noindex, nofollow">`, and advertises no sitemap in `robots.txt`.
+
+`robots.txt` on a non-indexable build still says `Allow: /` on purpose. `Disallow: /` would stop a
+crawler fetching the page, and a page it cannot fetch is a page whose `noindex` it can never read —
+which freezes anything already indexed instead of removing it.
+
+Verify after a stage deploy:
+
+```bash
+curl -sSI https://uhi9-token-launch-hook.vercel.app/ | grep -i x-robots-tag   # noindex, nofollow
+curl -sS  https://uhi9-token-launch-hook.vercel.app/robots.txt                # Allow: /, no Sitemap:
+curl -sSI https://unilaunch.envelop.is/ | grep -i x-robots-tag                # nothing (indexable)
+curl -sS  https://unilaunch.envelop.is/robots.txt | tail -2                   # Host: + Sitemap:
+```
 
 ## How the build resolves contract addresses
 
@@ -197,3 +229,4 @@ ssh devops@88.99.35.38 'docker inspect -f "{{.State.Status}} {{.State.Health.Sta
 ```
 
 Then run the functional checklist from the stage section against the prod URL.
+
