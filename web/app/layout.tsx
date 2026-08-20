@@ -31,19 +31,28 @@ export const metadata: Metadata = {
     : { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
   // Only meaningful on the origin it was issued for; harmless anywhere else.
   verification: { google: GOOGLE_SITE_VERIFICATION },
+  // `"./"` resolves against the *current* pathname, so every route — including one added later that
+  // forgets to declare its own — ships a self-referencing canonical instead of none at all. A page
+  // with no declared canonical is the page Google canonicalises for you, and it does not always pick
+  // a URL of yours (see tasks/task_021.md).
+  alternates: { canonical: "./" },
   openGraph: {
     type: "website",
-    url: SITE_URL,
+    // Was the bare SITE_URL, which every child route inherited verbatim: /launch and /governance both
+    // announced og:url = the homepage, contradicting their own rel=canonical. Same "./" resolution.
+    url: "./",
     siteName: SITE_NAME,
     locale: "en_US",
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    description: SITE_DESCRIPTION,
+    // No title/description here on purpose: a child route that does not declare its own `openGraph`
+    // inherits this object whole, so hard-coding them made /launch and /governance describe
+    // themselves as the homepage. Left out, Next fills each from that route's own title+description
+    // (postProcessMetadata → inheritFromMetadata), and the homepage still resolves to exactly the
+    // same two strings it had before.
     // og:image comes from app/opengraph-image.tsx (file convention) — no static asset to 404.
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    description: SITE_DESCRIPTION,
+    // Same reason as openGraph above — inherited per route rather than pinned to the homepage.
   },
 };
 
